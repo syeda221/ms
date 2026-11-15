@@ -522,6 +522,37 @@ class VoucherController extends Controller
             ];
 
             $rec = ReceiptsVoucher::create($voucherData);
+
+            // ✅ BILL-BY-BILL PAYMENT ALLOCATIONS (FIFO / MANUAL)
+            if ($request->has('allocations') && is_array($request->allocations)) {
+                foreach ($request->allocations as $invoiceId => $allocData) {
+                    $allocAmt = isset($allocData['amount']) ? (float) $allocData['amount'] : 0;
+                    if ($allocAmt > 0) {
+                        \App\Models\PaymentAllocation::create([
+                            'voucher_type' => 'receipt',
+                            'voucher_id'   => $rec->id,
+                            'voucher_no'   => $rvid,
+                            'invoice_type' => 'sale',
+                            'invoice_id'   => $invoiceId,
+                            'invoice_no'   => $allocData['invoice_no'] ?? null,
+                            'amount'       => $allocAmt,
+                            'date'         => $request->receipt_date,
+                        ]);
+
+                        $sale = \App\Models\Sale::lockForUpdate()->find($invoiceId);
+                        if ($sale) {
+                            $newPaid = (float) $sale->paid_amount + $allocAmt;
+                            $newDue = max(0, (float) $sale->total_net - $newPaid);
+                            $sale->update([
+                                'paid_amount'    => $newPaid,
+                                'due_amount'     => $newDue,
+                                'payment_status' => $newDue <= 0 ? 'paid' : 'partial',
+                            ]);
+                        }
+                    }
+                }
+            }
+
             // ✅ V2 VOUCHER INTEGRATION (Primary Logic Now)
             try {
                 \Log::info('V2 Integration Start. Type: '.$request->vendor_type.', ID: '.$request->vendor_id);
@@ -715,6 +746,36 @@ class VoucherController extends Controller
             ];
 
             $payment = PaymentVoucher::create($voucherData);
+
+            // ✅ BILL-BY-BILL PAYMENT ALLOCATIONS (FOR VENDOR BILLS)
+            if ($request->has('allocations') && is_array($request->allocations)) {
+                foreach ($request->allocations as $invoiceId => $allocData) {
+                    $allocAmt = isset($allocData['amount']) ? (float) $allocData['amount'] : 0;
+                    if ($allocAmt > 0) {
+                        \App\Models\PaymentAllocation::create([
+                            'voucher_type' => 'payment',
+                            'voucher_id'   => $payment->id,
+                            'voucher_no'   => $pvid,
+                            'invoice_type' => 'purchase',
+                            'invoice_id'   => $invoiceId,
+                            'invoice_no'   => $allocData['invoice_no'] ?? null,
+                            'amount'       => $allocAmt,
+                            'date'         => $request->receipt_date,
+                        ]);
+
+                        $purchase = \App\Models\Purchase::lockForUpdate()->find($invoiceId);
+                        if ($purchase) {
+                            $newPaid = (float) $purchase->paid_amount + $allocAmt;
+                            $newDue = max(0, (float) $purchase->net_amount - $newPaid);
+                            $purchase->update([
+                                'paid_amount'    => $newPaid,
+                                'due_amount'     => $newDue,
+                                'payment_status' => $newDue <= 0 ? 'paid' : 'partial',
+                            ]);
+                        }
+                    }
+                }
+            }
 
             $totalAmount = (float) $request->total_amount;
 
@@ -1113,6 +1174,60 @@ class VoucherController extends Controller
             'type'    => $type,
             'id'      => (int) $id,
         ]);
+    }
+
+    public function getPendingInvoices($type, $id)
+    {
+        try {
+            $invoices = [];
+            if ($type === 'customer' || $type === 'walkin') {
+                $sales = \App\Models\Sale::where('customer_id', $id)
+                    ->whereNotIn('sale_status', ['cancelled', 'returned'])
+                    ->where('due_amount', '>', 0)
+                    ->orderBy('created_at', 'asc')
+                    ->orderBy('id', 'asc')
+                    ->get();
+
+                foreach ($sales as $s) {
+                    $invoices[] = [
+                        'id'           => $s->id,
+                        'invoice_no'   => $s->invoice_no ?: ('INV-' . str_pad($s->id, 4, '0', STR_PAD_LEFT)),
+                        'date'         => $s->created_at ? $s->created_at->format('d-m-Y') : '',
+                        'total_amount' => (float) $s->total_net,
+                        'paid_amount'  => (float) $s->paid_amount,
+                        'due_amount'   => (float) $s->due_amount,
+                    ];
+                }
+            } elseif ($type === 'vendor') {
+                $purchases = \App\Models\Purchase::where('vendor_id', $id)
+                    ->where('due_amount', '>', 0)
+                    ->orderBy('purchase_date', 'asc')
+                    ->orderBy('id', 'asc')
+                    ->get();
+
+                foreach ($purchases as $p) {
+                    $invoices[] = [
+                        'id'           => $p->id,
+                        'invoice_no'   => $p->invoice_no ?: ('PUR-' . str_pad($p->id, 4, '0', STR_PAD_LEFT)),
+                        'date'         => $p->purchase_date ? \Carbon\Carbon::parse($p->purchase_date)->format('d-m-Y') : ($p->created_at ? $p->created_at->format('d-m-Y') : ''),
+                        'total_amount' => (float) $p->net_amount,
+                        'paid_amount'  => (float) $p->paid_amount,
+                        'due_amount'   => (float) $p->due_amount,
+                    ];
+                }
+            }
+
+            return response()->json([
+                'success'  => true,
+                'invoices' => $invoices,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+                'invoices' => []
+            ], 500);
+        }
     }
 
     public function partyList(Request $request)
@@ -1635,6 +1750,39 @@ class VoucherController extends Controller
                 $legacyRec->delete();
             }
 
+            // Revert Payment Allocations
+            $allocQuery = \App\Models\PaymentAllocation::where('voucher_type', 'receipt');
+            $vNoList = [];
+            $vIdList = [];
+            if ($legacyRec) {
+                $vIdList[] = $legacyRec->id;
+                if ($legacyRec->rvid) $vNoList[] = $legacyRec->rvid;
+            }
+            if ($voucherMaster) {
+                $vIdList[] = $voucherMaster->id;
+                if ($voucherMaster->voucher_no) $vNoList[] = $voucherMaster->voucher_no;
+            }
+            $allocations = $allocQuery->where(function($q) use ($vIdList, $vNoList) {
+                if (!empty($vIdList)) $q->whereIn('voucher_id', $vIdList);
+                if (!empty($vNoList)) $q->orWhereIn('voucher_no', $vNoList);
+            })->get();
+
+            foreach ($allocations as $alloc) {
+                if ($alloc->invoice_type === 'sale') {
+                    $sale = \App\Models\Sale::lockForUpdate()->find($alloc->invoice_id);
+                    if ($sale) {
+                        $newPaid = max(0, (float) $sale->paid_amount - (float) $alloc->amount);
+                        $newDue = max(0, (float) $sale->total_net - $newPaid);
+                        $sale->update([
+                            'paid_amount'    => $newPaid,
+                            'due_amount'     => $newDue,
+                            'payment_status' => $newDue <= 0 ? 'paid' : ($newPaid > 0 ? 'partial' : 'unpaid'),
+                        ]);
+                    }
+                }
+                $alloc->delete();
+            }
+
             DB::commit();
 
             return back()->with('success', 'Receipt Voucher deleted successfully.');
@@ -1706,6 +1854,39 @@ class VoucherController extends Controller
             if ($legacyPayment) {
                 $journalService->reverseEntriesForSource($legacyPayment);
                 $legacyPayment->delete();
+            }
+
+            // Revert Payment Allocations
+            $allocQuery = \App\Models\PaymentAllocation::where('voucher_type', 'payment');
+            $vNoList = [];
+            $vIdList = [];
+            if ($legacyPayment) {
+                $vIdList[] = $legacyPayment->id;
+                if ($legacyPayment->pvid) $vNoList[] = $legacyPayment->pvid;
+            }
+            if ($voucherMaster) {
+                $vIdList[] = $voucherMaster->id;
+                if ($voucherMaster->voucher_no) $vNoList[] = $voucherMaster->voucher_no;
+            }
+            $allocations = $allocQuery->where(function($q) use ($vIdList, $vNoList) {
+                if (!empty($vIdList)) $q->whereIn('voucher_id', $vIdList);
+                if (!empty($vNoList)) $q->orWhereIn('voucher_no', $vNoList);
+            })->get();
+
+            foreach ($allocations as $alloc) {
+                if ($alloc->invoice_type === 'purchase') {
+                    $purchase = \App\Models\Purchase::lockForUpdate()->find($alloc->invoice_id);
+                    if ($purchase) {
+                        $newPaid = max(0, (float) $purchase->paid_amount - (float) $alloc->amount);
+                        $newDue = max(0, (float) $purchase->net_amount - $newPaid);
+                        $purchase->update([
+                            'paid_amount'    => $newPaid,
+                            'due_amount'     => $newDue,
+                            'payment_status' => $newDue <= 0 ? 'paid' : ($newPaid > 0 ? 'partial' : 'unpaid'),
+                        ]);
+                    }
+                }
+                $alloc->delete();
             }
 
             DB::commit();

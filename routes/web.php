@@ -362,6 +362,7 @@ Route::middleware('auth')->group(function () {
 
     // Sale Return Routes - NEW SYSTEM
     Route::get('sale/return', [App\Http\Controllers\SaleReturnController::class, 'saleReturnIndex'])->middleware('permission:sales.view')->name('sale.return.index');
+    Route::get('sale/return/create-direct', [App\Http\Controllers\SaleReturnController::class, 'createStandaloneReturn'])->middleware('permission:sales.create')->name('sale.return.direct.create');
     Route::get('sale/return/{id}/view', [App\Http\Controllers\SaleReturnController::class, 'viewReturn'])->middleware('permission:sales.view')->name('sale.return.view');
     Route::get('sale/return/{id}', [App\Http\Controllers\SaleReturnController::class, 'showReturnForm'])->middleware('permission:sales.create')->name('sale.return.show');
     Route::post('sale/return/store', [App\Http\Controllers\SaleReturnController::class, 'processSaleReturn'])->middleware('permission:sales.create')->name('sale.return.store');
@@ -465,6 +466,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/getOpeningBalance/{type}/{id}', [VoucherController::class, 'getOpeningBalance']);
     Route::get('/voucher-balance/{type}/{id}', [VoucherController::class, 'voucherBalance'])->name('voucher.balance');
     Route::get('/party-list', [VoucherController::class, 'partyList'])->name('party.list');
+    Route::get('/get-pending-invoices/{type}/{id}', [VoucherController::class, 'getPendingInvoices'])->name('voucher.pending_invoices');
     Route::get('/receipt-vouchers/fetch', [VoucherController::class, 'fetchReceiptVouchers'])->name('receipt_vouchers.fetch');
 
     Route::post('/accounts-head/store', [AccountsHeadController::class, 'storeHead'])->name('account-heads.store');

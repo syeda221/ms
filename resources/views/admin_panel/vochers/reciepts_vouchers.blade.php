@@ -370,6 +370,62 @@
                             <i class="bi bi-plus-circle me-1"></i> Add Another Account
                         </button>
 
+                        <!-- Invoice Allocation Section (FIFO) -->
+                        <div id="invoiceAllocationSection" class="mt-4" style="display: none;">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <div class="rv-section-label m-0" style="font-size: 0.85rem;">
+                                    <i class="bi bi-receipt-cutoff me-1"></i> Pending Invoices / Bill-by-Bill Allocation
+                                    <span class="badge bg-primary ms-2" id="pendingInvoiceBadge" style="font-size: 0.72rem;">0 Invoices</span>
+                                </div>
+                                <div class="d-flex align-items-center gap-3">
+                                    <div class="form-check form-switch m-0">
+                                        <input class="form-check-input" type="checkbox" id="autoFifoToggle" checked style="cursor: pointer;">
+                                        <label class="form-check-label fw-bold text-dark small" for="autoFifoToggle" style="cursor: pointer;">
+                                            Auto-Distribute (FIFO)
+                                        </label>
+                                    </div>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary py-1 px-2" id="btnReloadInvoices" title="Refresh Invoices">
+                                        <i class="bi bi-arrow-clockwise"></i> Refresh
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="alert alert-info py-2 px-3 small d-flex justify-content-between align-items-center mb-2" style="border-radius: 8px;">
+                                <div>
+                                    <i class="bi bi-info-circle me-1"></i>
+                                    Amount automatically distributes <strong>FIFO (Oldest Pending Invoice First)</strong>. You can also manually adjust each invoice amount.
+                                </div>
+                                <div class="fw-bold" id="advanceSummaryText">
+                                    Advance / Unallocated: <span class="text-success" id="unallocatedAmt">Rs. 0.00</span>
+                                </div>
+                            </div>
+
+                            <div class="rv-table" style="max-height: 280px; overflow-y: auto;">
+                                <table class="table table-bordered table-sm align-middle mb-0" id="invoicesTable">
+                                    <thead>
+                                        <tr style="position: sticky; top: 0; z-index: 5;">
+                                            <th style="width: 16%;">Invoice #</th>
+                                            <th style="width: 16%;">Date</th>
+                                            <th style="width: 18%;" class="text-end">Total Bill</th>
+                                            <th style="width: 16%;" class="text-end">Already Paid</th>
+                                            <th style="width: 16%;" class="text-end">Due Balance</th>
+                                            <th style="width: 18%;" class="text-end">Allocate Amount</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="invoicesTableBody">
+                                        <!-- Loaded via AJAX -->
+                                    </tbody>
+                                    <tfoot>
+                                        <tr style="background: #f8fafc; font-weight: 700;">
+                                            <td colspan="4" class="text-end">Total Allocated:</td>
+                                            <td class="text-end text-danger" id="totalDueDisplay">Rs. 0.00</td>
+                                            <td class="text-end text-success" id="totalAllocatedDisplay">Rs. 0.00</td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+                        </div>
+
                         {{-- Hidden fields for backward compatibility --}}
                         <input type="hidden" name="narration_id[]" value="">
                         <input type="hidden" name="narration_text[]" value="">
@@ -464,6 +520,7 @@
                 $('#partyId').val(null).trigger('change');
                 $('#tel').val('');
                 updateBalance(0);
+                loadPendingInvoices(null, null);
             });
 
             // Party selected → load details & update balance
@@ -480,11 +537,145 @@
                 if (!$('#remarks').val() && partyName) {
                     $('#remarks').val('Receipt from ' + partyName);
                 }
+
+                // Load Pending Invoices
+                loadPendingInvoices($('#partyType').val(), item.id);
             });
 
             $('#partyId').on('select2:clear', function() {
                 $('#tel').val('');
                 updateBalance(0);
+                loadPendingInvoices(null, null);
+            });
+
+            // --- INVOICE ALLOCATION (FIFO) LOGIC ---
+            let currentInvoices = [];
+
+            function loadPendingInvoices(partyType, partyId) {
+                if (!partyId || (partyType !== 'customer' && partyType !== 'walkin' && partyType !== 'vendor')) {
+                    $('#invoiceAllocationSection').hide();
+                    $('#invoicesTableBody').empty();
+                    currentInvoices = [];
+                    return;
+                }
+
+                $('#invoicesTableBody').html('<tr><td colspan="6" class="text-center py-3 text-muted"><span class="spinner-border spinner-border-sm me-1"></span> Loading pending invoices...</td></tr>');
+                $('#invoiceAllocationSection').show();
+
+                $.ajax({
+                    url: '{{ url("get-pending-invoices") }}/' + partyType + '/' + partyId,
+                    type: 'GET',
+                    dataType: 'json',
+                    success: function(res) {
+                        if (res && res.success && res.invoices && res.invoices.length > 0) {
+                            currentInvoices = res.invoices;
+                            renderInvoicesTable();
+                            applyFIFOAllocation();
+                        } else {
+                            currentInvoices = [];
+                            $('#invoicesTableBody').html('<tr><td colspan="6" class="text-center py-3 text-muted"><i class="bi bi-check-circle text-success me-1"></i> No pending invoices found for this party. (Payment will be treated as Advance / On Account)</td></tr>');
+                            $('#pendingInvoiceBadge').text('0 Invoices').removeClass('bg-primary').addClass('bg-secondary');
+                            $('#totalDueDisplay').text('Rs. 0.00');
+                            $('#totalAllocatedDisplay').text('Rs. 0.00');
+                            updateAdvanceDisplay();
+                        }
+                    },
+                    error: function() {
+                        $('#invoicesTableBody').html('<tr><td colspan="6" class="text-center py-3 text-danger"><i class="bi bi-exclamation-triangle me-1"></i> Could not load pending invoices.</td></tr>');
+                    }
+                });
+            }
+
+            function renderInvoicesTable() {
+                let html = '';
+                let totalDue = 0;
+                $('#pendingInvoiceBadge').text(currentInvoices.length + ' Invoices').removeClass('bg-secondary').addClass('bg-primary');
+
+                currentInvoices.forEach(function(inv, idx) {
+                    totalDue += inv.due_amount;
+                    html += `
+                        <tr class="invoice-alloc-row" data-index="${idx}" data-id="${inv.id}" data-due="${inv.due_amount}">
+                            <td class="fw-bold text-dark">
+                                ${inv.invoice_no}
+                                <input type="hidden" name="allocations[${inv.id}][invoice_no]" value="${inv.invoice_no}">
+                            </td>
+                            <td>${inv.date}</td>
+                            <td class="text-end font-monospace">Rs. ${inv.total_amount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                            <td class="text-end font-monospace text-muted">Rs. ${inv.paid_amount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                            <td class="text-end font-monospace fw-bold text-danger">Rs. ${inv.due_amount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                            <td>
+                                <input type="number" step="0.01" min="0" max="${inv.due_amount}"
+                                    name="allocations[${inv.id}][amount]"
+                                    class="rv-input text-end fw-bold invoice-alloc-input p-1"
+                                    value="0.00" style="font-size: 0.95rem;">
+                            </td>
+                        </tr>
+                    `;
+                });
+
+                $('#invoicesTableBody').html(html);
+                $('#totalDueDisplay').text('Rs. ' + totalDue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}));
+            }
+
+            function applyFIFOAllocation() {
+                if (!$('#autoFifoToggle').is(':checked')) {
+                    updateAdvanceDisplay();
+                    return;
+                }
+
+                let totalPayment = parseFloat($('#totalAmount').val()) || 0;
+                let remaining = totalPayment;
+                let allocatedTotal = 0;
+
+                $('.invoice-alloc-row').each(function() {
+                    let due = parseFloat($(this).data('due')) || 0;
+                    let $input = $(this).find('.invoice-alloc-input');
+
+                    if (remaining > 0) {
+                        let alloc = Math.min(remaining, due);
+                        $input.val(alloc.toFixed(2));
+                        remaining -= alloc;
+                        allocatedTotal += alloc;
+                    } else {
+                        $input.val('0.00');
+                    }
+                });
+
+                $('#totalAllocatedDisplay').text('Rs. ' + allocatedTotal.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}));
+                updateAdvanceDisplay(remaining);
+            }
+
+            function updateAdvanceDisplay(excessAmt) {
+                if (excessAmt === undefined) {
+                    let totalPayment = parseFloat($('#totalAmount').val()) || 0;
+                    let allocatedTotal = 0;
+                    $('.invoice-alloc-input').each(function() {
+                        allocatedTotal += parseFloat($(this).val()) || 0;
+                    });
+                    excessAmt = Math.max(0, totalPayment - allocatedTotal);
+                    $('#totalAllocatedDisplay').text('Rs. ' + allocatedTotal.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}));
+                }
+
+                if (excessAmt > 0) {
+                    $('#unallocatedAmt').text('Rs. ' + excessAmt.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})).removeClass('text-muted').addClass('text-success fw-bold');
+                } else {
+                    $('#unallocatedAmt').text('Rs. 0.00').removeClass('text-success fw-bold').addClass('text-muted');
+                }
+            }
+
+            $('#btnReloadInvoices').on('click', function() {
+                loadPendingInvoices($('#partyType').val(), $('#partyId').val());
+            });
+
+            $('#autoFifoToggle').on('change', function() {
+                if ($(this).is(':checked')) {
+                    applyFIFOAllocation();
+                }
+            });
+
+            $(document).on('input', '.invoice-alloc-input', function() {
+                $('#autoFifoToggle').prop('checked', false);
+                updateAdvanceDisplay();
             });
 
             function updateBalance(bal) {
@@ -525,6 +716,7 @@
                     total += parseFloat($(this).val()) || 0;
                 });
                 $('#totalAmount').val(total.toFixed(2));
+                applyFIFOAllocation();
             }
             $(document).on('input', '.amount', function() {
                 calculateTotal();

@@ -366,6 +366,62 @@
                             <i class="bi bi-plus-circle me-1"></i> Add Another Row
                         </button>
 
+                        <!-- Purchase Bill Allocation Section (FIFO) -->
+                        <div id="billAllocationSection" class="mt-4" style="display: none;">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <div class="pv-section-label m-0" style="font-size: 0.85rem;">
+                                    <i class="bi bi-file-earmark-text me-1"></i> Pending Purchase Bills / Bill-by-Bill Allocation
+                                    <span class="badge bg-primary ms-2" id="pendingBillBadge" style="font-size: 0.72rem;">0 Bills</span>
+                                </div>
+                                <div class="d-flex align-items-center gap-3">
+                                    <div class="form-check form-switch m-0">
+                                        <input class="form-check-input" type="checkbox" id="autoFifoBillToggle" checked style="cursor: pointer;">
+                                        <label class="form-check-label fw-bold text-dark small" for="autoFifoBillToggle" style="cursor: pointer;">
+                                            Auto-Distribute (FIFO)
+                                        </label>
+                                    </div>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary py-1 px-2" id="btnReloadBills" title="Refresh Bills">
+                                        <i class="bi bi-arrow-clockwise"></i> Refresh
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="alert alert-info py-2 px-3 small d-flex justify-content-between align-items-center mb-2" style="border-radius: 8px;">
+                                <div>
+                                    <i class="bi bi-info-circle me-1"></i>
+                                    Amount automatically distributes <strong>FIFO (Oldest Pending Bill First)</strong>. You can also manually adjust each bill amount.
+                                </div>
+                                <div class="fw-bold" id="billAdvanceSummaryText">
+                                    Advance / Unallocated: <span class="text-danger" id="unallocatedBillAmt">Rs. 0.00</span>
+                                </div>
+                            </div>
+
+                            <div class="pv-table" style="max-height: 280px; overflow-y: auto;">
+                                <table class="table table-bordered table-sm align-middle mb-0" id="billsTable">
+                                    <thead>
+                                        <tr style="position: sticky; top: 0; z-index: 5;">
+                                            <th style="width: 16%;">Bill #</th>
+                                            <th style="width: 16%;">Date</th>
+                                            <th style="width: 18%;" class="text-end">Total Bill</th>
+                                            <th style="width: 16%;" class="text-end">Already Paid</th>
+                                            <th style="width: 16%;" class="text-end">Due Balance</th>
+                                            <th style="width: 18%;" class="text-end">Allocate Amount</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="billsTableBody">
+                                        <!-- Loaded via AJAX -->
+                                    </tbody>
+                                    <tfoot>
+                                        <tr style="background: #f8fafc; font-weight: 700;">
+                                            <td colspan="4" class="text-end">Total Allocated:</td>
+                                            <td class="text-end text-danger" id="totalBillDueDisplay">Rs. 0.00</td>
+                                            <td class="text-end text-success" id="totalBillAllocatedDisplay">Rs. 0.00</td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+                        </div>
+
                         {{-- Hidden fields for backward compatibility --}}
                         <input type="hidden" name="narration_id[]" value="">
                         <input type="hidden" name="narration_text[]" value="">
@@ -490,6 +546,7 @@
                     total += parseFloat($(this).val()) || 0;
                 });
                 $('#totalAmount').val(total.toFixed(2));
+                applyFIFOBillAllocation();
             }
             $(document).on('input', '.amount', function() {
                 calculateTotal();
@@ -544,6 +601,147 @@
                 if ($('#voucherTable tbody tr').length > 1) {
                     $(this).closest('tr').remove();
                     calculateTotal();
+                }
+            });
+
+            // --- PURCHASE BILL ALLOCATION (FIFO) LOGIC ---
+            let currentBills = [];
+
+            function loadPendingBills(partyType, partyId) {
+                if (!partyId || partyType !== 'vendor') {
+                    $('#billAllocationSection').hide();
+                    $('#billsTableBody').empty();
+                    currentBills = [];
+                    return;
+                }
+
+                $('#billsTableBody').html('<tr><td colspan="6" class="text-center py-3 text-muted"><span class="spinner-border spinner-border-sm me-1"></span> Loading pending bills...</td></tr>');
+                $('#billAllocationSection').show();
+
+                $.ajax({
+                    url: '{{ url("get-pending-invoices") }}/' + partyType + '/' + partyId,
+                    type: 'GET',
+                    dataType: 'json',
+                    success: function(res) {
+                        if (res && res.success && res.invoices && res.invoices.length > 0) {
+                            currentBills = res.invoices;
+                            renderBillsTable();
+                            applyFIFOBillAllocation();
+                        } else {
+                            currentBills = [];
+                            $('#billsTableBody').html('<tr><td colspan="6" class="text-center py-3 text-muted"><i class="bi bi-check-circle text-success me-1"></i> No pending purchase bills found for this vendor. (Payment will be treated as Advance / On Account)</td></tr>');
+                            $('#pendingBillBadge').text('0 Bills').removeClass('bg-primary').addClass('bg-secondary');
+                            $('#totalBillDueDisplay').text('Rs. 0.00');
+                            $('#totalBillAllocatedDisplay').text('Rs. 0.00');
+                            updateBillAdvanceDisplay();
+                        }
+                    },
+                    error: function() {
+                        $('#billsTableBody').html('<tr><td colspan="6" class="text-center py-3 text-danger"><i class="bi bi-exclamation-triangle me-1"></i> Could not load pending purchase bills.</td></tr>');
+                    }
+                });
+            }
+
+            function renderBillsTable() {
+                let html = '';
+                let totalDue = 0;
+                $('#pendingBillBadge').text(currentBills.length + ' Bills').removeClass('bg-secondary').addClass('bg-primary');
+
+                currentBills.forEach(function(inv, idx) {
+                    totalDue += inv.due_amount;
+                    html += `
+                        <tr class="bill-alloc-row" data-index="${idx}" data-id="${inv.id}" data-due="${inv.due_amount}">
+                            <td class="fw-bold text-dark">
+                                ${inv.invoice_no}
+                                <input type="hidden" name="allocations[${inv.id}][invoice_no]" value="${inv.invoice_no}">
+                            </td>
+                            <td>${inv.date}</td>
+                            <td class="text-end font-monospace">Rs. ${inv.total_amount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                            <td class="text-end font-monospace text-muted">Rs. ${inv.paid_amount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                            <td class="text-end font-monospace fw-bold text-danger">Rs. ${inv.due_amount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                            <td>
+                                <input type="number" step="0.01" min="0" max="${inv.due_amount}"
+                                    name="allocations[${inv.id}][amount]"
+                                    class="pv-input text-end fw-bold bill-alloc-input p-1"
+                                    value="0.00" style="font-size: 0.95rem;">
+                            </td>
+                        </tr>
+                    `;
+                });
+
+                $('#billsTableBody').html(html);
+                $('#totalBillDueDisplay').text('Rs. ' + totalDue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}));
+            }
+
+            function applyFIFOBillAllocation() {
+                if (!$('#autoFifoBillToggle').is(':checked')) {
+                    updateBillAdvanceDisplay();
+                    return;
+                }
+
+                let totalPayment = parseFloat($('#totalAmount').val()) || 0;
+                let remaining = totalPayment;
+                let allocatedTotal = 0;
+
+                $('.bill-alloc-row').each(function() {
+                    let due = parseFloat($(this).data('due')) || 0;
+                    let $input = $(this).find('.bill-alloc-input');
+
+                    if (remaining > 0) {
+                        let alloc = Math.min(remaining, due);
+                        $input.val(alloc.toFixed(2));
+                        remaining -= alloc;
+                        allocatedTotal += alloc;
+                    } else {
+                        $input.val('0.00');
+                    }
+                });
+
+                $('#totalBillAllocatedDisplay').text('Rs. ' + allocatedTotal.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}));
+                updateBillAdvanceDisplay(remaining);
+            }
+
+            function updateBillAdvanceDisplay(excessAmt) {
+                if (excessAmt === undefined) {
+                    let totalPayment = parseFloat($('#totalAmount').val()) || 0;
+                    let allocatedTotal = 0;
+                    $('.bill-alloc-input').each(function() {
+                        allocatedTotal += parseFloat($(this).val()) || 0;
+                    });
+                    excessAmt = Math.max(0, totalPayment - allocatedTotal);
+                    $('#totalBillAllocatedDisplay').text('Rs. ' + allocatedTotal.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}));
+                }
+
+                if (excessAmt > 0) {
+                    $('#unallocatedBillAmt').text('Rs. ' + excessAmt.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})).removeClass('text-muted').addClass('text-danger fw-bold');
+                } else {
+                    $('#unallocatedBillAmt').text('Rs. 0.00').removeClass('text-danger fw-bold').addClass('text-muted');
+                }
+            }
+
+            $('#btnReloadBills').on('click', function() {
+                let firstPartyType = $('.rowType').first().val();
+                let firstPartyId = $('.rowParty').first().val();
+                loadPendingBills(firstPartyType, firstPartyId);
+            });
+
+            $('#autoFifoBillToggle').on('change', function() {
+                if ($(this).is(':checked')) {
+                    applyFIFOBillAllocation();
+                }
+            });
+
+            $(document).on('input', '.bill-alloc-input', function() {
+                $('#autoFifoBillToggle').prop('checked', false);
+                updateBillAdvanceDisplay();
+            });
+
+            $(document).on('change', '.rowParty', function() {
+                let $firstRow = $('#voucherTable tbody tr').first();
+                let type = $firstRow.find('.rowType').val();
+                let partyId = $firstRow.find('.rowParty').val();
+                if ($(this).closest('tr').is($firstRow) && type === 'vendor') {
+                    loadPendingBills(type, partyId);
                 }
             });
         });

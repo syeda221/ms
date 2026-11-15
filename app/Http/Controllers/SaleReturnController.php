@@ -17,6 +17,21 @@ use Carbon\Carbon;
 
 class SaleReturnController extends Controller
 {
+    /**
+     * Show Standalone Sale Return Form (Direct Return without Sale Invoice)
+     */
+    public function createStandaloneReturn()
+    {
+        $customers = Customer::orderBy('customer_name')->get();
+        $warehouses = Warehouse::all();
+        $products = Product::with('brand')->orderBy('item_name')->get();
+        $accounts = Account::whereHas('head', function($q) {
+            $q->whereIn('name', ['Cash', 'Bank']);
+        })->where('status', 1)->orderBy('title')->get();
+
+        return view('admin_panel.sale.sale_return.standalone_create', compact('customers', 'warehouses', 'products', 'accounts'));
+    }
+
     public function showReturnForm($id)
     {
         $sale = Sale::with(['customer_relation', 'items.product.brand'])->findOrFail($id);

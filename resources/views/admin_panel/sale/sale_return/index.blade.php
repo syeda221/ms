@@ -9,7 +9,12 @@
 
                         <div class="d-flex justify-content-between align-items-center mb-3">
                             <h3>Sale Returns</h3>
-                            <a class="btn btn-primary" href="{{ route('sale.index') }}">Back to Purchases</a>
+                            <div>
+                                <a class="btn btn-success me-2" href="{{ route('sale.return.direct.create') }}">
+                                    <i class="fa fa-plus"></i> + Add Standalone Return
+                                </a>
+                                <a class="btn btn-primary" href="{{ route('sale.index') }}">Back to Sales</a>
+                            </div>
                         </div>
 
                         <div class="border mt-1 shadow rounded bg-white">

@@ -27,4 +27,9 @@ class Purchase extends Model
     public function vendor()   { return $this->belongsTo(Vendor::class, 'vendor_id'); }
     public function items()    { return $this->hasMany(PurchaseItem::class); }
     public function returns()  { return $this->hasMany(PurchaseReturn::class); }
+
+    public function paymentAllocations()
+    {
+        return $this->hasMany(PaymentAllocation::class, 'invoice_id')->where('invoice_type', 'purchase');
+    }
 }

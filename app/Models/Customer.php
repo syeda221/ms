@@ -22,6 +22,11 @@ class Customer extends Model
         return $this->belongsTo(SalesOfficer::class, 'sales_officer_id');
     }
 
+    public function getCustomValue($key)
+    {
+        return $this->$key ?? ($this->attributes[$key] ?? null);
+    }
+
     /**
      * Polymorphic relationship to journal entries
      */

@@ -187,6 +187,16 @@
             transform: translateY(-2px);
             box-shadow: 0 4px 10px rgba(239, 68, 68, 0.1) !important;
         }
+        .sales-hdr-actions .btn-outline-warning {
+            border-color: #f59e0b !important;
+            color: #d97706 !important;
+            background: transparent !important;
+        }
+        .sales-hdr-actions .btn-outline-warning:hover {
+            background: linear-gradient(135deg, rgba(245,158,11,0.1), rgba(245,158,11,0.05)) !important;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 10px rgba(245, 158, 11, 0.15) !important;
+        }
 
         /* Filter Pills Modernization */
         .sales-status-pills .btn {
@@ -746,6 +756,12 @@
                             href="{{ route('sale.return.index') }}" style="border-radius: 8px;">
                             <i class="fas fa-undo"></i> Returns
                         </a>
+                        @can('sales.create')
+                            <a class="btn btn-outline-warning px-3 shadow-sm fw-medium d-inline-flex align-items-center justify-content-center gap-1"
+                                href="{{ route('sale.return.direct.create') }}" style="border-radius: 8px;">
+                                <i class="fas fa-undo-alt"></i> Standalone Return
+                            </a>
+                        @endcan
                         <a class="btn btn-outline-primary px-3 shadow-sm fw-medium d-inline-flex align-items-center justify-content-center gap-1"
                             href="{{ url('bookings') }}" style="border-radius: 8px;">
                             <i class="fas fa-bookmark"></i> Bookings

@@ -409,6 +409,79 @@
     margin-bottom: 20px;
 }
 
+/* ========= INVOICE ALLOCATION CONTAINER (FIFO) ========= */
+.alloc-table-container {
+    max-height: 380px;
+    overflow-y: auto;
+    overflow-x: auto;
+    border: 1px solid var(--voucher-border);
+    border-radius: 10px;
+    background: #ffffff;
+    margin-bottom: 20px;
+    position: relative;
+    clear: both;
+    display: block;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+}
+
+.alloc-table-container table {
+    width: 100%;
+    margin-bottom: 0 !important;
+    border-collapse: separate !important;
+    border-spacing: 0;
+}
+
+.alloc-table-container thead th {
+    position: sticky;
+    top: 0;
+    background-color: #1e293b !important;
+    color: #ffffff !important;
+    z-index: 10;
+    font-size: 12.5px;
+    font-weight: 600;
+    padding: 10px 12px;
+    border-bottom: 2px solid #0f172a !important;
+    border-top: none !important;
+    border-left: none !important;
+    border-right: 1px solid #334155 !important;
+}
+
+.alloc-table-container thead th:last-child {
+    border-right: none !important;
+}
+
+.alloc-table-container tbody td {
+    padding: 8px 12px;
+    font-size: 13px;
+    vertical-align: middle;
+    border-bottom: 1px solid #e2e8f0;
+    border-right: 1px solid #f1f5f9;
+    background-color: #ffffff;
+}
+
+.alloc-table-container tbody td:last-child {
+    border-right: none;
+}
+
+.alloc-table-container tbody tr:hover td {
+    background-color: #f8fafc;
+}
+
+.alloc-table-container tfoot {
+    position: sticky;
+    bottom: 0;
+    z-index: 9;
+}
+
+.alloc-table-container tfoot td {
+    padding: 10px 12px;
+    font-size: 13px;
+    font-weight: 700;
+    background-color: #f8fafc !important;
+    border-top: 2px solid #cbd5e1 !important;
+    border-bottom: none !important;
+}
+
 @media (max-width: 768px) {
     .voucher-types {
         grid-template-columns: repeat(1, 1fr);
@@ -638,6 +711,62 @@
                             <input type="text" name="remarks" class="form-control" placeholder="Optional details">
                         </div>
                     </div>
+
+                    <!-- Invoice Allocation Section (FIFO) for Payment In -->
+                    <div id="pi_invoice_allocation_section" class="mt-3 mb-3" style="display: none;">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h6 class="sub-heading sub-heading-primary m-0" style="font-size: 13px;">
+                                <i class="fas fa-receipt me-1"></i> Pending Invoices / Bill-by-Bill Allocation
+                                <span class="badge bg-primary ms-2" id="pi_invoice_badge">0 Invoices</span>
+                            </h6>
+                            <div class="d-flex align-items-center gap-3">
+                                <div class="form-check form-switch m-0">
+                                    <input class="form-check-input" type="checkbox" id="pi_auto_fifo_toggle" checked style="cursor: pointer;">
+                                    <label class="form-check-label fw-bold small text-muted" for="pi_auto_fifo_toggle" style="cursor: pointer;">
+                                        Auto-Distribute (FIFO)
+                                    </label>
+                                </div>
+                                <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2" id="pi_btn_reload_invoices" title="Refresh Invoices">
+                                    <i class="fas fa-sync-alt"></i> Refresh
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="alert alert-info py-2 px-3 small d-flex justify-content-between align-items-center mb-2" style="border-radius: 8px;">
+                            <div>
+                                <i class="fas fa-info-circle me-1"></i>
+                                Amount is automatically allocated <strong>FIFO (Oldest Pending Invoice First)</strong>. You can also manually adjust each invoice amount.
+                            </div>
+                            <div class="fw-bold" id="pi_advance_summary">
+                                Advance / Unallocated: <span class="text-success" id="pi_unallocated_amount">Rs. 0.00</span>
+                            </div>
+                        </div>
+
+                        <div class="alloc-table-container">
+                            <table class="table table-bordered table-sm align-middle mb-0" id="pi_invoices_table">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 16%;">Invoice #</th>
+                                        <th style="width: 16%;">Date</th>
+                                        <th style="width: 18%;" class="text-end">Total Bill</th>
+                                        <th style="width: 16%;" class="text-end">Already Paid</th>
+                                        <th style="width: 16%;" class="text-end">Due Balance</th>
+                                        <th style="width: 18%;" class="text-end">Allocate Amount</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="pi_invoices_tbody">
+                                    <!-- Dynamic rows -->
+                                </tbody>
+                                <tfoot>
+                                    <tr class="table-light fw-bold">
+                                        <td colspan="4" class="text-end">Total Allocated:</td>
+                                        <td class="text-end text-danger" id="pi_total_due_display">Rs. 0.00</td>
+                                        <td class="text-end text-success" id="pi_total_allocated_display">Rs. 0.00</td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    </div>
                     <div class="d-flex justify-content-end mt-4">
                         <button type="submit" class="btn btn-voucher">
                             <i class="fas fa-check-circle me-1"></i> Save Payment In
@@ -727,6 +856,62 @@
                         <div class="col-md-4">
                             <label class="form-label">Remarks</label>
                             <input type="text" name="remarks" class="form-control" placeholder="Optional details">
+                        </div>
+                    </div>
+
+                    <!-- Purchase Bill Allocation Section (FIFO) for Payment Out -->
+                    <div id="po_bill_allocation_section" class="mt-3 mb-3" style="display: none;">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h6 class="sub-heading sub-heading-danger m-0" style="font-size: 13px;">
+                                <i class="fas fa-file-invoice me-1"></i> Pending Purchase Bills / Bill-by-Bill Allocation
+                                <span class="badge bg-danger ms-2" id="po_bill_badge">0 Bills</span>
+                            </h6>
+                            <div class="d-flex align-items-center gap-3">
+                                <div class="form-check form-switch m-0">
+                                    <input class="form-check-input" type="checkbox" id="po_auto_fifo_toggle" checked style="cursor: pointer;">
+                                    <label class="form-check-label fw-bold small text-muted" for="po_auto_fifo_toggle" style="cursor: pointer;">
+                                        Auto-Distribute (FIFO)
+                                    </label>
+                                </div>
+                                <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2" id="po_btn_reload_bills" title="Refresh Bills">
+                                    <i class="fas fa-sync-alt"></i> Refresh
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="alert alert-info py-2 px-3 small d-flex justify-content-between align-items-center mb-2" style="border-radius: 8px;">
+                            <div>
+                                <i class="fas fa-info-circle me-1"></i>
+                                Amount is automatically allocated <strong>FIFO (Oldest Pending Bill First)</strong>. You can also manually adjust each bill amount.
+                            </div>
+                            <div class="fw-bold" id="po_advance_summary">
+                                Advance / Unallocated: <span class="text-danger" id="po_unallocated_amount">Rs. 0.00</span>
+                            </div>
+                        </div>
+
+                        <div class="alloc-table-container">
+                            <table class="table table-bordered table-sm align-middle mb-0" id="po_bills_table">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 16%;">Bill #</th>
+                                        <th style="width: 16%;">Date</th>
+                                        <th style="width: 18%;" class="text-end">Total Bill</th>
+                                        <th style="width: 16%;" class="text-end">Already Paid</th>
+                                        <th style="width: 16%;" class="text-end">Due Balance</th>
+                                        <th style="width: 18%;" class="text-end">Allocate Amount</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="po_bills_tbody">
+                                    <!-- Dynamic rows -->
+                                </tbody>
+                                <tfoot>
+                                    <tr class="table-light fw-bold">
+                                        <td colspan="4" class="text-end">Total Allocated:</td>
+                                        <td class="text-end text-danger" id="po_total_due_display">Rs. 0.00</td>
+                                        <td class="text-end text-success" id="po_total_allocated_display">Rs. 0.00</td>
+                                    </tr>
+                                </tfoot>
+                            </table>
                         </div>
                     </div>
                     <div class="d-flex justify-content-end mt-4">
@@ -1020,6 +1205,20 @@
             $('#formTitle').html(formTitles[type] || '');
             initSelect2();
             initDatepickers();
+
+            if (type === 'payment_in') {
+                var piId = $('#pi_vendor_wrapper').is(':visible') ? $('#pi_vendor_select').val() : $('#pi_customer_select').val();
+                if (piId) {
+                    fetchVoucherBalance($('#pi_party_balance'), piPartyType(), piId);
+                    loadPendingInvoicesPI(piPartyType(), piId);
+                }
+            } else if (type === 'payment_out') {
+                var poId = $('#po_customer_wrapper').is(':visible') ? $('#po_customer_select').val() : $('#po_vendor_select').val();
+                if (poId) {
+                    fetchVoucherBalance($('#po_party_balance'), poPartyType(), poId);
+                    loadPendingBillsPO(poPartyType(), poId);
+                }
+            }
         });
 
         // ============== SELECT2 INITIALIZE ==============
@@ -1110,8 +1309,9 @@
             initSelect2();
         });
 
-        // ============== LIVE BALANCE INDICATORS (Payment In/Out & Party Transfer) ==============
-        var voucherBalanceUrl = '{{ route("voucher.balance", ["type" => "__TYPE__", "id" => "__ID__"]) }}';
+        // ============== LIVE BALANCE INDICATORS & PENDING INVOICES (Payment In/Out & Party Transfer) ==============
+        var voucherBalanceUrl = '/voucher-balance/__TYPE__/__ID__';
+        var pendingInvoicesUrl = '/get-pending-invoices/__TYPE__/__ID__';
 
         function renderVoucherBalance($el, balance, label, display, type) {
             $el.removeClass('loading dr cr zero');
@@ -1154,38 +1354,307 @@
                 });
         }
 
-        // ---- Payment In ----
+        // ---- INVOICE ALLOCATION (FIFO) FOR PAYMENT IN ----
+        var piCurrentInvoices = [];
+
+        function loadPendingInvoicesPI(partyType, partyId) {
+            if (!partyId || (partyType !== 'customer' && partyType !== 'walkin' && partyType !== 'vendor')) {
+                $('#pi_invoice_allocation_section').hide();
+                $('#pi_invoices_tbody').empty();
+                piCurrentInvoices = [];
+                return;
+            }
+
+            $('#pi_invoices_tbody').html('<tr><td colspan="6" class="text-center py-3 text-muted"><span class="spinner-border spinner-border-sm me-1"></span> Loading pending invoices...</td></tr>');
+            $('#pi_invoice_allocation_section').show();
+
+            $.ajax({
+                url: pendingInvoicesUrl.replace('__TYPE__', encodeURIComponent(partyType)).replace('__ID__', encodeURIComponent(partyId)),
+                type: 'GET',
+                dataType: 'json',
+                success: function(res) {
+                    if (res && res.success && res.invoices && res.invoices.length > 0) {
+                        piCurrentInvoices = res.invoices;
+                        renderPiInvoicesTable();
+                        applyFifoPI();
+                    } else {
+                        piCurrentInvoices = [];
+                        $('#pi_invoices_tbody').html('<tr><td colspan="6" class="text-center py-3 text-muted"><i class="fas fa-check-circle text-success me-1"></i> No pending invoices found for this party. (Payment will be treated as Advance / On Account)</td></tr>');
+                        $('#pi_invoice_badge').text('0 Invoices').removeClass('bg-primary').addClass('bg-secondary');
+                        $('#pi_total_due_display').text('Rs. 0.00');
+                        $('#pi_total_allocated_display').text('Rs. 0.00');
+                        updatePiAdvanceDisplay();
+                    }
+                },
+                error: function() {
+                    $('#pi_invoices_tbody').html('<tr><td colspan="6" class="text-center py-3 text-danger"><i class="fas fa-exclamation-triangle me-1"></i> Could not load pending invoices.</td></tr>');
+                }
+            });
+        }
+
+        function renderPiInvoicesTable() {
+            var html = '';
+            var totalDue = 0;
+            $('#pi_invoice_badge').text(piCurrentInvoices.length + ' Invoices').removeClass('bg-secondary').addClass('bg-primary');
+
+            piCurrentInvoices.forEach(function(inv, idx) {
+                totalDue += parseFloat(inv.due_amount) || 0;
+                html += `
+                    <tr class="pi-invoice-alloc-row" data-index="${idx}" data-id="${inv.id}" data-due="${inv.due_amount}">
+                        <td class="fw-bold text-dark">
+                            ${inv.invoice_no}
+                            <input type="hidden" name="allocations[${inv.id}][invoice_no]" value="${inv.invoice_no}">
+                        </td>
+                        <td>${inv.date}</td>
+                        <td class="text-end font-monospace">Rs. ${parseFloat(inv.total_amount).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                        <td class="text-end font-monospace text-muted">Rs. ${parseFloat(inv.paid_amount).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                        <td class="text-end font-monospace fw-bold text-danger">Rs. ${parseFloat(inv.due_amount).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                        <td>
+                            <input type="number" step="0.01" min="0" max="${inv.due_amount}"
+                                name="allocations[${inv.id}][amount]"
+                                class="form-control form-control-sm text-end fw-bold pi-invoice-alloc-input p-1"
+                                value="0.00" style="font-size: 0.95rem;">
+                        </td>
+                    </tr>
+                `;
+            });
+
+            $('#pi_invoices_tbody').html(html);
+            $('#pi_total_due_display').text('Rs. ' + totalDue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}));
+        }
+
+        function applyFifoPI() {
+            if (!$('#pi_auto_fifo_toggle').is(':checked')) {
+                updatePiAdvanceDisplay();
+                return;
+            }
+
+            var totalPayment = parseFloat($('#pi_amount').val()) || 0;
+            var remaining = totalPayment;
+            var allocatedTotal = 0;
+
+            $('.pi-invoice-alloc-row').each(function() {
+                var due = parseFloat($(this).data('due')) || 0;
+                var $input = $(this).find('.pi-invoice-alloc-input');
+
+                if (remaining > 0) {
+                    var alloc = Math.min(remaining, due);
+                    $input.val(alloc.toFixed(2));
+                    remaining -= alloc;
+                    allocatedTotal += alloc;
+                } else {
+                    $input.val('0.00');
+                }
+            });
+
+            $('#pi_total_allocated_display').text('Rs. ' + allocatedTotal.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}));
+            updatePiAdvanceDisplay(remaining);
+        }
+
+        function updatePiAdvanceDisplay(excessAmt) {
+            if (excessAmt === undefined) {
+                var totalPayment = parseFloat($('#pi_amount').val()) || 0;
+                var allocatedTotal = 0;
+                $('.pi-invoice-alloc-input').each(function() {
+                    allocatedTotal += parseFloat($(this).val()) || 0;
+                });
+                excessAmt = Math.max(0, totalPayment - allocatedTotal);
+                $('#pi_total_allocated_display').text('Rs. ' + allocatedTotal.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}));
+            }
+
+            if (excessAmt > 0) {
+                $('#pi_unallocated_amount').text('Rs. ' + excessAmt.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})).removeClass('text-muted').addClass('text-success fw-bold');
+            } else {
+                $('#pi_unallocated_amount').text('Rs. 0.00').removeClass('text-success fw-bold').addClass('text-muted');
+            }
+        }
+
+        // ---- BILL ALLOCATION (FIFO) FOR PAYMENT OUT ----
+        var poCurrentBills = [];
+
+        function loadPendingBillsPO(partyType, partyId) {
+            if (!partyId || (partyType !== 'vendor' && partyType !== 'customer' && partyType !== 'walkin')) {
+                $('#po_bill_allocation_section').hide();
+                $('#po_bills_tbody').empty();
+                poCurrentBills = [];
+                return;
+            }
+
+            $('#po_bills_tbody').html('<tr><td colspan="6" class="text-center py-3 text-muted"><span class="spinner-border spinner-border-sm me-1"></span> Loading pending bills...</td></tr>');
+            $('#po_bill_allocation_section').show();
+
+            $.ajax({
+                url: pendingInvoicesUrl.replace('__TYPE__', encodeURIComponent(partyType)).replace('__ID__', encodeURIComponent(partyId)),
+                type: 'GET',
+                dataType: 'json',
+                success: function(res) {
+                    if (res && res.success && res.invoices && res.invoices.length > 0) {
+                        poCurrentBills = res.invoices;
+                        renderPoBillsTable();
+                        applyFifoPO();
+                    } else {
+                        poCurrentBills = [];
+                        $('#po_bills_tbody').html('<tr><td colspan="6" class="text-center py-3 text-muted"><i class="fas fa-check-circle text-success me-1"></i> No pending purchase bills found for this party. (Payment will be treated as Advance / On Account)</td></tr>');
+                        $('#po_bill_badge').text('0 Bills').removeClass('bg-danger').addClass('bg-secondary');
+                        $('#po_total_due_display').text('Rs. 0.00');
+                        $('#po_total_allocated_display').text('Rs. 0.00');
+                        updatePoAdvanceDisplay();
+                    }
+                },
+                error: function() {
+                    $('#po_bills_tbody').html('<tr><td colspan="6" class="text-center py-3 text-danger"><i class="fas fa-exclamation-triangle me-1"></i> Could not load pending purchase bills.</td></tr>');
+                }
+            });
+        }
+
+        function renderPoBillsTable() {
+            var html = '';
+            var totalDue = 0;
+            $('#po_bill_badge').text(poCurrentBills.length + ' Bills').removeClass('bg-secondary').addClass('bg-danger');
+
+            poCurrentBills.forEach(function(inv, idx) {
+                totalDue += parseFloat(inv.due_amount) || 0;
+                html += `
+                    <tr class="po-bill-alloc-row" data-index="${idx}" data-id="${inv.id}" data-due="${inv.due_amount}">
+                        <td class="fw-bold text-dark">
+                            ${inv.invoice_no}
+                            <input type="hidden" name="allocations[${inv.id}][invoice_no]" value="${inv.invoice_no}">
+                        </td>
+                        <td>${inv.date}</td>
+                        <td class="text-end font-monospace">Rs. ${parseFloat(inv.total_amount).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                        <td class="text-end font-monospace text-muted">Rs. ${parseFloat(inv.paid_amount).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                        <td class="text-end font-monospace fw-bold text-danger">Rs. ${parseFloat(inv.due_amount).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                        <td>
+                            <input type="number" step="0.01" min="0" max="${inv.due_amount}"
+                                name="allocations[${inv.id}][amount]"
+                                class="form-control form-control-sm text-end fw-bold po-bill-alloc-input p-1"
+                                value="0.00" style="font-size: 0.95rem;">
+                        </td>
+                    </tr>
+                `;
+            });
+
+            $('#po_bills_tbody').html(html);
+            $('#po_total_due_display').text('Rs. ' + totalDue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}));
+        }
+
+        function applyFifoPO() {
+            if (!$('#po_auto_fifo_toggle').is(':checked')) {
+                updatePoAdvanceDisplay();
+                return;
+            }
+
+            var totalPayment = parseFloat($('#po_amount').val()) || 0;
+            var remaining = totalPayment;
+            var allocatedTotal = 0;
+
+            $('.po-bill-alloc-row').each(function() {
+                var due = parseFloat($(this).data('due')) || 0;
+                var $input = $(this).find('.po-bill-alloc-input');
+
+                if (remaining > 0) {
+                    var alloc = Math.min(remaining, due);
+                    $input.val(alloc.toFixed(2));
+                    remaining -= alloc;
+                    allocatedTotal += alloc;
+                } else {
+                    $input.val('0.00');
+                }
+            });
+
+            $('#po_total_allocated_display').text('Rs. ' + allocatedTotal.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}));
+            updatePoAdvanceDisplay(remaining);
+        }
+
+        function updatePoAdvanceDisplay(excessAmt) {
+            if (excessAmt === undefined) {
+                var totalPayment = parseFloat($('#po_amount').val()) || 0;
+                var allocatedTotal = 0;
+                $('.po-bill-alloc-input').each(function() {
+                    allocatedTotal += parseFloat($(this).val()) || 0;
+                });
+                excessAmt = Math.max(0, totalPayment - allocatedTotal);
+                $('#po_total_allocated_display').text('Rs. ' + allocatedTotal.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}));
+            }
+
+            if (excessAmt > 0) {
+                $('#po_unallocated_amount').text('Rs. ' + excessAmt.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})).removeClass('text-muted').addClass('text-danger fw-bold');
+            } else {
+                $('#po_unallocated_amount').text('Rs. 0.00').removeClass('text-danger fw-bold').addClass('text-muted');
+            }
+        }
+
+        // ---- Payment In Event Handlers ----
         function piPartyType() {
             return $('.pi-party-type:checked').val() || 'customer';
         }
-        $(document).on('change', '#pi_customer_select, #pi_vendor_select', function() {
-            fetchVoucherBalance($('#pi_party_balance'), piPartyType(), $(this).val());
+        $(document).on('change select2:select', '#pi_customer_select, #pi_vendor_select', function() {
+            var partyId = $(this).val();
+            fetchVoucherBalance($('#pi_party_balance'), piPartyType(), partyId);
+            loadPendingInvoicesPI(piPartyType(), partyId);
         });
-        $(document).on('change', '#pi_deposit_account', function() {
+        $(document).on('change select2:select', '#pi_deposit_account', function() {
             fetchVoucherBalance($('#pi_deposit_balance'), 'account', $(this).val());
         });
-        // When party type radio changes, re-fetch on the currently active party select
         var piPartyTypeHandler = function() {
             var id = $('#pi_vendor_wrapper').is(':visible') ? $('#pi_vendor_select').val() : $('#pi_customer_select').val();
             fetchVoucherBalance($('#pi_party_balance'), piPartyType(), id);
+            loadPendingInvoicesPI(piPartyType(), id);
         };
         $(document).on('change', '.pi-party-type', piPartyTypeHandler);
 
-        // ---- Payment Out ----
+        $(document).on('input', '#pi_amount', function() {
+            applyFifoPI();
+        });
+        $('#pi_btn_reload_invoices').on('click', function() {
+            var id = $('#pi_vendor_wrapper').is(':visible') ? $('#pi_vendor_select').val() : $('#pi_customer_select').val();
+            loadPendingInvoicesPI(piPartyType(), id);
+        });
+        $('#pi_auto_fifo_toggle').on('change', function() {
+            if ($(this).is(':checked')) {
+                applyFifoPI();
+            }
+        });
+        $(document).on('input', '.pi-invoice-alloc-input', function() {
+            $('#pi_auto_fifo_toggle').prop('checked', false);
+            updatePiAdvanceDisplay();
+        });
+
+        // ---- Payment Out Event Handlers ----
         function poPartyType() {
             return $('.po-party-type:checked').val() || 'vendor';
         }
-        $(document).on('change', '#po_vendor_select, #po_customer_select', function() {
-            fetchVoucherBalance($('#po_party_balance'), poPartyType(), $(this).val());
+        $(document).on('change select2:select', '#po_vendor_select, #po_customer_select', function() {
+            var partyId = $(this).val();
+            fetchVoucherBalance($('#po_party_balance'), poPartyType(), partyId);
+            loadPendingBillsPO(poPartyType(), partyId);
         });
-        $(document).on('change', '#po_payfrom_account', function() {
+        $(document).on('change select2:select', '#po_payfrom_account', function() {
             fetchVoucherBalance($('#po_payfrom_balance'), 'account', $(this).val());
         });
         var poPartyTypeHandler = function() {
             var id = $('#po_customer_wrapper').is(':visible') ? $('#po_customer_select').val() : $('#po_vendor_select').val();
             fetchVoucherBalance($('#po_party_balance'), poPartyType(), id);
+            loadPendingBillsPO(poPartyType(), id);
         };
         $(document).on('change', '.po-party-type', poPartyTypeHandler);
+
+        $(document).on('input', '#po_amount', function() {
+            applyFifoPO();
+        });
+        $('#po_btn_reload_bills').on('click', function() {
+            var id = $('#po_customer_wrapper').is(':visible') ? $('#po_customer_select').val() : $('#po_vendor_select').val();
+            loadPendingBillsPO(poPartyType(), id);
+        });
+        $('#po_auto_fifo_toggle').on('change', function() {
+            if ($(this).is(':checked')) {
+                applyFifoPO();
+            }
+        });
+        $(document).on('input', '.po-bill-alloc-input', function() {
+            $('#po_auto_fifo_toggle').prop('checked', false);
+            updatePoAdvanceDisplay();
+        });
 
         // ---- Party-To-Party Transfer ----
         function ptSrcType() {
@@ -1194,10 +1663,10 @@
         function ptDstType() {
             return $('.pt-dst-party-type:checked').val() || 'vendor';
         }
-        $(document).on('change', '#pt_src_customer_select, #pt_src_vendor_select', function() {
+        $(document).on('change select2:select', '#pt_src_customer_select, #pt_src_vendor_select', function() {
             fetchVoucherBalance($('#pt_src_balance'), ptSrcType(), $(this).val());
         });
-        $(document).on('change', '#pt_dst_vendor_select, #pt_dst_customer_select', function() {
+        $(document).on('change select2:select', '#pt_dst_vendor_select, #pt_dst_customer_select', function() {
             fetchVoucherBalance($('#pt_dst_balance'), ptDstType(), $(this).val());
         });
         var ptSrcPartyTypeHandler = function() {
@@ -1212,7 +1681,7 @@
         $(document).on('change', '.pt-dst-party-type', ptDstPartyTypeHandler);
 
         // ---- Internal Transfer (Bank / Cash) ----
-        $(document).on('change', '#it_from_account', function() {
+        $(document).on('change select2:select', '#it_from_account', function() {
             var val = $(this).val();
             fetchVoucherBalance($('#it_from_balance'), 'account', val);
             if (val && val === $('#it_to_account').val()) {
@@ -1222,7 +1691,7 @@
             }
         });
 
-        $(document).on('change', '#it_to_account', function() {
+        $(document).on('change select2:select', '#it_to_account', function() {
             var val = $(this).val();
             fetchVoucherBalance($('#it_to_balance'), 'account', val);
             if (val && val === $('#it_from_account').val()) {

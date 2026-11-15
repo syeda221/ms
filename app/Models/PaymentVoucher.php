@@ -17,4 +17,9 @@ class PaymentVoucher extends Model
         $nextId = $last ? $last->id + 1 : 1;
         return 'PVID-' . str_pad($nextId, 4, '0', STR_PAD_LEFT);
     }
+
+    public function paymentAllocations()
+    {
+        return $this->hasMany(PaymentAllocation::class, 'voucher_id')->where('voucher_type', 'payment');
+    }
 }

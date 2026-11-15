@@ -1435,6 +1435,11 @@ class SaleController extends Controller
             $sale->change = ($sale->cash - $sale->total_net);
             $sale->change_account_id = $request->input('change_account_id') ?: null;
 
+            $initialPaid = min($sale->total_net, (float)($sale->cash ?? 0) + (float)($sale->card ?? 0));
+            $sale->paid_amount = $initialPaid;
+            $sale->due_amount = max(0, $sale->total_net - $initialPaid);
+            $sale->payment_status = $sale->due_amount <= 0 ? 'paid' : ($initialPaid > 0 ? 'partial' : 'unpaid');
+
             if ($isWalkin && $sale->change < -0.05) {
                 throw \Illuminate\Validation\ValidationException::withMessages([
                     'cash' => 'Walk-in customers must pay 100% upfront. Balance cannot be unpaid.'

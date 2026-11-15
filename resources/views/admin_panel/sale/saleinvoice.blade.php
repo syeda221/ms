@@ -530,9 +530,9 @@
 
                         @php
                             $relCust = $sale->customer_relation;
-                            $custNtn = $relCust ? ($relCust->getCustomValue('ntn_number') ?? $relCust->ntn_number ?? null) : null;
-                            $custStrn = $relCust ? ($relCust->getCustomValue('strn_number') ?? $relCust->strn_number ?? null) : null;
-                            $custCnic = $relCust ? ($relCust->getCustomValue('cnic') ?? $relCust->cnic ?? null) : null;
+                            $custNtn = $relCust ? ($relCust->ntn_number ?? (method_exists($relCust, 'getCustomValue') ? $relCust->getCustomValue('ntn_number') : null)) : null;
+                            $custStrn = $relCust ? ($relCust->strn_number ?? (method_exists($relCust, 'getCustomValue') ? $relCust->getCustomValue('strn_number') : null)) : null;
+                            $custCnic = $relCust ? ($relCust->cnic ?? (method_exists($relCust, 'getCustomValue') ? $relCust->getCustomValue('cnic') : null)) : null;
                         @endphp
 
                         @if(!empty($custNtn))
@@ -1506,8 +1506,23 @@
 
                         </tr>
 
+                        <tr>
+                            <td class="text-success fw-bold" style="padding-top: 5px;">
+                                Received Amount
+                            </td>
+                            <td class="text-end text-success fw-bold font-monospace" style="padding-top: 5px;">
+                                Rs. {{ number_format($sale->paid_amount ?? 0, 2) }}
+                            </td>
+                        </tr>
 
-
+                        <tr>
+                            <td class="text-danger fw-bold" style="padding-top: 3px;">
+                                Remaining / Due
+                            </td>
+                            <td class="text-end text-danger fw-bold font-monospace" style="padding-top: 3px;">
+                                Rs. {{ number_format($sale->due_amount ?? 0, 2) }}
+                            </td>
+                        </tr>
 
                     </table>
 
@@ -2273,6 +2288,15 @@
 
                 @endif
 
+            </div>
+
+            <div class="tot-row" style="margin-top: 4px; border-top: 1px dashed #000; padding-top: 3px;">
+                <span>RECEIVED:</span>
+                <span>Rs. {{ number_format($sale->paid_amount ?? 0, 0) }}</span>
+            </div>
+            <div class="tot-row" style="font-weight: 700;">
+                <span>REMAINING / DUE:</span>
+                <span>Rs. {{ number_format($sale->due_amount ?? 0, 0) }}</span>
             </div>
 
         </div>
