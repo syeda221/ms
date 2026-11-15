@@ -156,14 +156,17 @@ class VendorController extends Controller
 
     // Soft delete vendor and related ledger entry
     public function delete($id) {
-    // Find the vendor by id, along with the related ledger entry using the 'ledger' relationship
-    $vendor = Vendor::with('ledger')->findOrFail($id);
+        $vendor = Vendor::with('ledger')->findOrFail($id);
 
-    // The vendor's ledger will be automatically deleted due to cascading delete
-    $vendor->delete(); // Soft delete vendor
+        if ($vendor->hasTransactions()) {
+            return back()->with('error', 'Cannot delete vendor. This vendor has existing purchases, payments, or ledger transactions.');
+        }
 
-    return back()->with('success', 'Deleted Successfully');
-}
+        // The vendor's ledger will be automatically deleted due to cascading delete
+        $vendor->delete(); // Soft delete vendor
+
+        return back()->with('success', 'Vendor Deleted Successfully');
+    }
 
 
     // Show vendor ledger

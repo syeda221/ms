@@ -288,6 +288,14 @@ class CustomerController extends Controller
     public function destroy($id)
     {
         $customer = Customer::findOrFail($id);
+
+        if ($customer->hasTransactions()) {
+            return redirect()->route('customers.index')->with('error', 'Cannot delete customer. This customer has existing sales, payments, or ledger transactions.');
+        }
+
+        // Clean up opening balance entry if any
+        $this->syncOpeningBalance($customer, 0);
+
         $customer->delete();
 
         return redirect()->route('customers.index')->with('success', 'Customer deleted successfully.');

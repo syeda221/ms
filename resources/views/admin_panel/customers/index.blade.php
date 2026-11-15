@@ -154,13 +154,16 @@
                                             @endif
                                         </td>
                                         <td>
+                                            @php
+                                                $hasTransactions = $customer->hasTransactions();
+                                            @endphp
                                             @include('admin_panel.partials.action_buttons', [
                                                 'editRoute' => route('customers.edit', $customer->id),
-                                                'deleteRoute' => route('customers.destroy', $customer->id),
+                                                'deleteRoute' => $hasTransactions ? null : route('customers.destroy', $customer->id),
                                                 'editIsLink' => true,
                                                 'permissions' => [
                                                     'edit' => 'customers.edit',
-                                                    'delete' => 'customers.delete',
+                                                    'delete' => $hasTransactions ? null : 'customers.delete',
                                                 ],
                                                 'dataId' => $customer->id,
                                             ])

@@ -660,8 +660,7 @@
                       <button type="button" class="btn btn-sm btn-secondary" id="btnPrint">Print</button>
                       <button type="button" class="btn btn-sm btn-secondary" id="btnPrint2">Print-2</button>
                       <button type="button" class="btn btn-sm btn-secondary" id="btnDCPrint">DC Print</button>
-
-                      <button type="button" class="btn btn-sm btn-danger" id="btnDelete">Delete</button>
+                      {{-- <button type="button" class="btn btn-sm btn-danger" id="btnDelete">Delete</button> --}}
                       <button type="button" class="btn btn-sm btn-dark" id="btnExit">Exit</button>
                   </div>
               </form>

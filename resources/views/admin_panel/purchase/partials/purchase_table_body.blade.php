@@ -144,6 +144,7 @@
                         @endcan
                     @endif
 
+                    {{-- Delete button disabled as requested
                     @if ($purchase->status_purchase == 'draft')
                         @can('purchases.delete')
                             <li><hr class="dropdown-divider"></li>
@@ -158,6 +159,7 @@
                             </li>
                         @endcan
                     @endif
+                    --}}
                 </ul>
             </div>
         </td>

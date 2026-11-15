@@ -332,13 +332,16 @@
                             </td>
                             <td class="text-secondary small">{{ Str::limit($v->address, 35) ?: '—' }}</td>
                             <td class="text-end pe-4">
+                                @php
+                                    $hasTransactions = $v->hasTransactions();
+                                @endphp
                                 @include('admin_panel.partials.action_buttons', [
                                     'editRoute' => 'javascript:void(0)',
-                                    'deleteRoute' => url('vendor/delete/' . $v->id),
+                                    'deleteRoute' => $hasTransactions ? null : url('vendor/delete/' . $v->id),
                                     'editIsLink' => false,
                                     'permissions' => [
                                         'edit' => 'vendors.edit',
-                                        'delete' => 'vendors.delete',
+                                        'delete' => $hasTransactions ? null : 'vendors.delete',
                                     ],
                                     'dataId' => $v->id,
                                 ])
@@ -381,11 +384,11 @@
                     <div class="vendor-mcard-actions">
                         @include('admin_panel.partials.action_buttons', [
                             'editRoute' => 'javascript:void(0)',
-                            'deleteRoute' => url('vendor/delete/' . $v->id),
+                            'deleteRoute' => $hasTransactions ? null : url('vendor/delete/' . $v->id),
                             'editIsLink' => false,
                             'permissions' => [
                                 'edit' => 'vendors.edit',
-                                'delete' => 'vendors.delete',
+                                'delete' => $hasTransactions ? null : 'vendors.delete',
                             ],
                             'dataId' => $v->id,
                         ])

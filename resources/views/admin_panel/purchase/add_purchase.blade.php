@@ -195,11 +195,13 @@
                                             <span>Item</span>
                                         </a>
 
+                                        {{-- 
                                         <a href="#" class="gp-action-btn danger"
                                             onclick="return confirm('Delete this gatepass?')">
                                             <i class="fa fa-trash"></i>
                                             <span>Delete</span>
-                                        </a>
+                                        </a> 
+                                        --}}
 
                                     </div>
                                 </div>

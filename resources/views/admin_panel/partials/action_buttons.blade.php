@@ -22,6 +22,6 @@
     @endif
 @endif
 
-@if($canDelete)
+@if($canDelete && !empty($deleteRoute))
     <button class="btn btn-danger btn-sm delete-btn" {!! $dataIdAttr !!} data-url="{{ $deleteRoute }}" data-msg="{{ $deleteMsg ?? 'Are you sure?' }}" data-method="get" onclick="logoutAndDeleteFunction(this)">{{ $deleteLabel ?? 'Delete' }}</button>
 @endif
