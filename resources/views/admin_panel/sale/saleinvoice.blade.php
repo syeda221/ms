@@ -530,9 +530,9 @@
 
                         @php
                             $relCust = $sale->customer_relation;
-                            $custNtn = $relCust ? ($relCust->ntn_number ?? (method_exists($relCust, 'getCustomValue') ? $relCust->getCustomValue('ntn_number') : null)) : null;
-                            $custStrn = $relCust ? ($relCust->strn_number ?? (method_exists($relCust, 'getCustomValue') ? $relCust->getCustomValue('strn_number') : null)) : null;
-                            $custCnic = $relCust ? ($relCust->cnic ?? (method_exists($relCust, 'getCustomValue') ? $relCust->getCustomValue('cnic') : null)) : null;
+                            $custNtn = $relCust ? ($relCust->ntn_number ?? $relCust->ntn ?? null) : null;
+                            $custStrn = $relCust ? ($relCust->strn_number ?? $relCust->strn ?? null) : null;
+                            $custCnic = $relCust ? ($relCust->cnic ?? null) : null;
                         @endphp
 
                         @if(!empty($custNtn))
@@ -1515,14 +1515,39 @@
                             </td>
                         </tr>
 
+                        @if(isset($previousBalance) && abs($previousBalance) > 0)
+                        <tr>
+                            <td class="text-secondary" style="padding-top: 3px;">
+                                Previous Balance
+                            </td>
+                            <td class="text-end text-secondary font-monospace" style="padding-top: 3px;">
+                                Rs. {{ number_format($previousBalance, 2) }}
+                            </td>
+                        </tr>
+                        @endif
+
                         <tr>
                             <td class="text-danger fw-bold" style="padding-top: 3px;">
-                                Remaining / Due
+                                Current Bill Due
                             </td>
                             <td class="text-end text-danger fw-bold font-monospace" style="padding-top: 3px;">
                                 Rs. {{ number_format($sale->due_amount ?? 0, 2) }}
                             </td>
                         </tr>
+
+                        @php
+                            $totalNetOutstanding = ($previousBalance ?? 0) + ($sale->due_amount ?? 0);
+                        @endphp
+                        @if(isset($previousBalance) && abs($previousBalance) > 0)
+                        <tr style="border-top: 1px solid #cbd5e1;">
+                            <td class="fw-bold" style="padding-top: 4px; color: #0f172a;">
+                                Total Due (Kul Baqaya)
+                            </td>
+                            <td class="text-end fw-bold font-monospace" style="padding-top: 4px; color: #0f172a;">
+                                Rs. {{ number_format($totalNetOutstanding, 2) }}
+                            </td>
+                        </tr>
+                        @endif
 
                     </table>
 
@@ -2294,10 +2319,25 @@
                 <span>RECEIVED:</span>
                 <span>Rs. {{ number_format($sale->paid_amount ?? 0, 0) }}</span>
             </div>
+            @if(isset($previousBalance) && abs($previousBalance) > 0)
+            <div class="tot-row">
+                <span>PREV BALANCE:</span>
+                <span>Rs. {{ number_format($previousBalance, 0) }}</span>
+            </div>
+            @endif
             <div class="tot-row" style="font-weight: 700;">
-                <span>REMAINING / DUE:</span>
+                <span>THIS BILL DUE:</span>
                 <span>Rs. {{ number_format($sale->due_amount ?? 0, 0) }}</span>
             </div>
+            @if(isset($previousBalance) && abs($previousBalance) > 0)
+            @php
+                $thermalTotalDue = ($previousBalance ?? 0) + ($sale->due_amount ?? 0);
+            @endphp
+            <div class="tot-row" style="font-weight: 800; border-top: 1px dashed #000; padding-top: 2px;">
+                <span>TOTAL DUE:</span>
+                <span>Rs. {{ number_format($thermalTotalDue, 0) }}</span>
+            </div>
+            @endif
 
         </div>
 
