@@ -262,6 +262,7 @@ class VoucherController extends Controller
                               ->orWhere('description', 'like', "%RVID-0{$cleanRvid}%");
                         }
                     })
+                    ->orderByDesc('id')
                     ->first();
 
                 if ($ledger) {
@@ -270,10 +271,17 @@ class VoucherController extends Controller
                 } else {
                     $priorLedger = DB::table('vendor_ledgers')
                         ->where('vendor_id', $voucher->party_id)
+                        ->where(function($q) use ($voucher, $cleanRvid) {
+                            $q->where('description', 'not like', "%{$voucher->rvid}%");
+                            if ($cleanRvid) {
+                                $q->where('description', 'not like', "%RVID-{$cleanRvid}%")
+                                  ->where('description', 'not like', "%RVID-0{$cleanRvid}%");
+                            }
+                        })
                         ->where('created_at', '<=', $voucher->created_at)
                         ->orderByDesc('id')
                         ->first();
-                    $previousBalance = $priorLedger ? (float) $priorLedger->closing_balance : 0.0;
+                    $previousBalance = $priorLedger ? (float) $priorLedger->closing_balance : (float) ($party->opening_balance ?? 0.0);
                     $balanceAfter = $previousBalance - (float) $voucher->total_amount;
                 }
             } elseif (in_array($voucher->type, ['customer', 'walkin'])) {
@@ -288,6 +296,7 @@ class VoucherController extends Controller
                               ->orWhere('description', 'like', "%RVID-0{$cleanRvid}%");
                         }
                     })
+                    ->orderByDesc('id')
                     ->first();
 
                 if ($ledger) {
@@ -296,10 +305,17 @@ class VoucherController extends Controller
                 } else {
                     $priorLedger = DB::table('customer_ledgers')
                         ->where('customer_id', $voucher->party_id)
+                        ->where(function($q) use ($voucher, $cleanRvid) {
+                            $q->where('description', 'not like', "%{$voucher->rvid}%");
+                            if ($cleanRvid) {
+                                $q->where('description', 'not like', "%RVID-{$cleanRvid}%")
+                                  ->where('description', 'not like', "%RVID-0{$cleanRvid}%");
+                            }
+                        })
                         ->where('created_at', '<=', $voucher->created_at)
                         ->orderByDesc('id')
                         ->first();
-                    $previousBalance = $priorLedger ? (float) $priorLedger->closing_balance : 0.0;
+                    $previousBalance = $priorLedger ? (float) $priorLedger->closing_balance : (float) ($party->opening_balance ?? 0.0);
                     $balanceAfter = $previousBalance - (float) $voucher->total_amount;
                 }
             } elseif (is_numeric($voucher->type)) {
@@ -316,7 +332,8 @@ class VoucherController extends Controller
                 $balanceAfter = $previousBalance - (float) $voucher->total_amount;
             }
 
-            $allocations = \App\Models\PaymentAllocation::where('voucher_type', 'receipt')
+            $allocations = \App\Models\PaymentAllocation::with(['sale'])
+                ->where('voucher_type', 'receipt')
                 ->where(function($q) use ($voucher) {
                     $q->where('voucher_id', $voucher->id)
                       ->orWhere('voucher_no', $voucher->rvid);
@@ -608,20 +625,47 @@ class VoucherController extends Controller
 
                         \Log::info('V2 Voucher Created Successfully.');
 
-                        // ✅ Also update CustomerLedger for correct balance display on form
+                        // ✅ Also update CustomerLedger / VendorLedger for correct balance display
                         if (($vType == 'customer' || $vType == 'walkin') && $totalAmt > 0) {
-                            $latestLedger = CustomerLedger::where('customer_id', $request->vendor_id)->latest()->first();
-                            $prevBal = $latestLedger ? $latestLedger->closing_balance : (
+                            $latestLedger = CustomerLedger::where('customer_id', $request->vendor_id)->latest('id')->first();
+                            $prevBal = $latestLedger ? (float) $latestLedger->closing_balance : (float) (
                                 \App\Models\Customer::find($request->vendor_id)->opening_balance ?? 0
                             );
+                            $newBal = $prevBal - $totalAmt; // Payment received → balance reduces
                             CustomerLedger::create([
                                 'customer_id'      => $request->vendor_id,
-                                'admin_or_user_id' => auth()->id(),
+                                'admin_or_user_id' => auth()->id() ?? 1,
                                 'previous_balance' => $prevBal,
                                 'opening_balance'  => 0,
-                                'closing_balance'  => $prevBal - $totalAmt, // Payment received → balance reduces
+                                'closing_balance'  => $newBal,
                                 'description'      => 'Receipt Voucher '.$rvid,
                             ]);
+
+                            $cust = \App\Models\Customer::find($request->vendor_id);
+                            if ($cust) {
+                                $cust->previous_balance = $newBal;
+                                $cust->save();
+                            }
+                        } elseif ($vType == 'vendor' && $totalAmt > 0) {
+                            $latestLedger = VendorLedger::where('vendor_id', $request->vendor_id)->latest('id')->first();
+                            $prevBal = $latestLedger ? (float) $latestLedger->closing_balance : (float) (
+                                \App\Models\Vendor::find($request->vendor_id)->opening_balance ?? 0
+                            );
+                            $newBal = $prevBal + $totalAmt;
+                            VendorLedger::create([
+                                'vendor_id'        => $request->vendor_id,
+                                'admin_or_user_id' => auth()->id() ?? 1,
+                                'previous_balance' => $prevBal,
+                                'opening_balance'  => 0,
+                                'closing_balance'  => $newBal,
+                                'description'      => 'Receipt Voucher '.$rvid,
+                            ]);
+
+                            $vend = \App\Models\Vendor::find($request->vendor_id);
+                            if ($vend) {
+                                $vend->previous_balance = $newBal;
+                                $vend->save();
+                            }
                         }
 
                     } else {
@@ -867,26 +911,42 @@ class VoucherController extends Controller
                     }
 
                     if ($type === 'vendor') {
-                        $ledger = VendorLedger::where('vendor_id', $partyId)->latest()->first();
-                        $bal = $ledger ? $ledger->closing_balance : 0;
+                        $ledger = VendorLedger::where('vendor_id', $partyId)->latest('id')->first();
+                        $bal = $ledger ? (float) $ledger->closing_balance : (float) (\App\Models\Vendor::find($partyId)->opening_balance ?? 0);
+                        $newBal = $bal - $rowAmount; // ✅ MINUS: payment reduces vendor balance
                         VendorLedger::create([
                             'vendor_id'         => $partyId,
-                            'admin_or_user_id'  => auth()->id(),
+                            'admin_or_user_id'  => auth()->id() ?? 1,
                             'opening_balance'   => 0,
                             'previous_balance'  => $bal,
-                            'closing_balance'   => $bal - $rowAmount, // ✅ MINUS: payment reduces vendor balance
+                            'closing_balance'   => $newBal,
+                            'description'       => 'Payment Voucher '.$pvid,
                         ]);
 
+                        $vend = \App\Models\Vendor::find($partyId);
+                        if ($vend) {
+                            $vend->previous_balance = $newBal;
+                            $vend->save();
+                        }
+
                     } elseif ($type === 'customer' || $type === 'walkin') {
-                        $ledger = CustomerLedger::where('customer_id', $partyId)->latest()->first();
-                        $bal = $ledger ? $ledger->closing_balance : 0;
+                        $ledger = CustomerLedger::where('customer_id', $partyId)->latest('id')->first();
+                        $bal = $ledger ? (float) $ledger->closing_balance : (float) (\App\Models\Customer::find($partyId)->opening_balance ?? 0);
+                        $newBal = $bal + $rowAmount; // ✅ PLUS: paying customer increases customer balance
                         CustomerLedger::create([
                             'customer_id'      => $partyId,
-                            'admin_or_user_id' => auth()->id(),
+                            'admin_or_user_id' => auth()->id() ?? 1,
                             'previous_balance' => $bal,
                             'opening_balance'  => 0,
-                            'closing_balance'  => $bal + $rowAmount, // ✅ PLUS: paying customer increases customer balance
+                            'closing_balance'  => $newBal,
+                            'description'      => 'Payment Voucher '.$pvid,
                         ]);
+
+                        $cust = \App\Models\Customer::find($partyId);
+                        if ($cust) {
+                            $cust->previous_balance = $newBal;
+                            $cust->save();
+                        }
                     } elseif ($type) {
                         // Account ID in table
                         $acc = Account::find($partyId);
@@ -1046,6 +1106,7 @@ class VoucherController extends Controller
                               ->orWhere('description', 'like', "%PVID-0{$cleanPvid}%");
                         }
                     })
+                    ->orderByDesc('id')
                     ->first();
 
                 if ($ledger) {
@@ -1054,10 +1115,17 @@ class VoucherController extends Controller
                 } else {
                     $priorLedger = DB::table('vendor_ledgers')
                         ->where('vendor_id', $voucher->party_id)
+                        ->where(function($q) use ($voucher, $cleanPvid) {
+                            $q->where('description', 'not like', "%{$voucher->pvid}%");
+                            if ($cleanPvid) {
+                                $q->where('description', 'not like', "%PVID-{$cleanPvid}%")
+                                  ->where('description', 'not like', "%PVID-0{$cleanPvid}%");
+                            }
+                        })
                         ->where('created_at', '<=', $voucher->created_at)
                         ->orderByDesc('id')
                         ->first();
-                    $previousBalance = $priorLedger ? (float) $priorLedger->closing_balance : 0.0;
+                    $previousBalance = $priorLedger ? (float) $priorLedger->closing_balance : (float) ($party->opening_balance ?? 0.0);
                     $balanceAfter    = $previousBalance - (float) $voucher->total_amount;
                 }
             } elseif ($voucher->type === 'customer') {
@@ -1072,6 +1140,7 @@ class VoucherController extends Controller
                               ->orWhere('description', 'like', "%PVID-0{$cleanPvid}%");
                         }
                     })
+                    ->orderByDesc('id')
                     ->first();
 
                 if ($ledger) {
@@ -1080,10 +1149,17 @@ class VoucherController extends Controller
                 } else {
                     $priorLedger = DB::table('customer_ledgers')
                         ->where('customer_id', $voucher->party_id)
+                        ->where(function($q) use ($voucher, $cleanPvid) {
+                            $q->where('description', 'not like', "%{$voucher->pvid}%");
+                            if ($cleanPvid) {
+                                $q->where('description', 'not like', "%PVID-{$cleanPvid}%")
+                                  ->where('description', 'not like', "%PVID-0{$cleanPvid}%");
+                            }
+                        })
                         ->where('created_at', '<=', $voucher->created_at)
                         ->orderByDesc('id')
                         ->first();
-                    $previousBalance = $priorLedger ? (float) $priorLedger->closing_balance : 0.0;
+                    $previousBalance = $priorLedger ? (float) $priorLedger->closing_balance : (float) ($party->opening_balance ?? 0.0);
                     $balanceAfter    = $previousBalance - (float) $voucher->total_amount;
                 }
             } elseif ($voucher->type === 'walkin') {
@@ -1094,7 +1170,8 @@ class VoucherController extends Controller
                 $balanceAfter = $previousBalance - (float) $voucher->total_amount;
             }
 
-            $allocations = \App\Models\PaymentAllocation::where('voucher_type', 'payment')
+            $allocations = \App\Models\PaymentAllocation::with(['purchase'])
+                ->where('voucher_type', 'payment')
                 ->where(function($q) use ($voucher) {
                     $q->where('voucher_id', $voucher->id)
                       ->orWhere('voucher_no', $voucher->pvid);
@@ -1486,7 +1563,7 @@ class VoucherController extends Controller
              * STEP 2: Party side → MINUS
              */
             if ($request->vendor_type === 'vendor') {
-                $ledger = VendorLedger::where('vendor_id', $request->vendor_id)->latest()->first();
+                $ledger = VendorLedger::where('vendor_id', $request->vendor_id)->latest('id')->first();
                 if ($ledger) {
                     $ledger->previous_balance = $ledger->closing_balance;
                     $ledger->closing_balance = $ledger->closing_balance - $amount; // MINUS
@@ -1494,7 +1571,7 @@ class VoucherController extends Controller
                 } else {
                     VendorLedger::create([
                         'vendor_id' => $request->vendor_id,
-                        'admin_or_user_id' => auth()->id(),
+                        'admin_or_user_id' => auth()->id() ?? 1,
                         'opening_balance' => 0,
                         'previous_balance' => 0,
                         'closing_balance' => -$amount,
@@ -1512,7 +1589,7 @@ class VoucherController extends Controller
                     \App\Models\Vendor::find($request->vendor_id)
                 );
             } elseif ($request->vendor_type === 'customer') {
-                $ledger = CustomerLedger::where('customer_id', $request->vendor_id)->latest()->first();
+                $ledger = CustomerLedger::where('customer_id', $request->vendor_id)->latest('id')->first();
                 if ($ledger) {
                     $ledger->previous_balance = $ledger->closing_balance;
                     $ledger->closing_balance = $ledger->closing_balance - $amount; // MINUS
@@ -1520,7 +1597,7 @@ class VoucherController extends Controller
                 } else {
                     CustomerLedger::create([
                         'customer_id' => $request->vendor_id,
-                        'admin_or_user_id' => auth()->id(),
+                        'admin_or_user_id' => auth()->id() ?? 1,
                         'previous_balance' => 0,
                         'opening_balance' => 0,
                         'closing_balance' => -$amount,
@@ -2067,22 +2144,22 @@ class VoucherController extends Controller
 
             // 1. Source Party Ledger (Deduct)
             if ($request->source_party_type === 'customer') {
-                $latestLedger = CustomerLedger::where('customer_id', $request->source_party_id)->latest()->first();
+                $latestLedger = CustomerLedger::where('customer_id', $request->source_party_id)->latest('id')->first();
                 $prevBal = $latestLedger ? $latestLedger->closing_balance : (Customer::find($request->source_party_id)->opening_balance ?? 0);
                 CustomerLedger::create([
                     'customer_id'      => $request->source_party_id,
-                    'admin_or_user_id' => auth()->id(),
+                    'admin_or_user_id' => auth()->id() ?? 1,
                     'previous_balance' => $prevBal,
                     'opening_balance'  => 0,
                     'closing_balance'  => $prevBal - $amount,
                     'description'      => "Party Transfer to {$destName} (Ref: {$tvid})" . ($remarks ? " - {$remarks}" : ""),
                 ]);
             } else {
-                $latestLedger = VendorLedger::where('vendor_id', $request->source_party_id)->latest()->first();
+                $latestLedger = VendorLedger::where('vendor_id', $request->source_party_id)->latest('id')->first();
                 $prevBal = $latestLedger ? $latestLedger->closing_balance : (\App\Models\Vendor::find($request->source_party_id)->opening_balance ?? 0);
                 VendorLedger::create([
                     'vendor_id'        => $request->source_party_id,
-                    'admin_or_user_id' => auth()->id(),
+                    'admin_or_user_id' => auth()->id() ?? 1,
                     'previous_balance' => $prevBal,
                     'opening_balance'  => 0,
                     'closing_balance'  => $prevBal - $amount,
@@ -2091,22 +2168,22 @@ class VoucherController extends Controller
 
             // 2. Destination Party Ledger (Transfer To / Credit)
             if ($request->destination_party_type === 'customer') {
-                $latestLedger = CustomerLedger::where('customer_id', $request->destination_party_id)->latest()->first();
+                $latestLedger = CustomerLedger::where('customer_id', $request->destination_party_id)->latest('id')->first();
                 $prevBal = $latestLedger ? $latestLedger->closing_balance : (Customer::find($request->destination_party_id)->opening_balance ?? 0);
                 CustomerLedger::create([
                     'customer_id'      => $request->destination_party_id,
-                    'admin_or_user_id' => auth()->id(),
+                    'admin_or_user_id' => auth()->id() ?? 1,
                     'previous_balance' => $prevBal,
                     'opening_balance'  => 0,
                     'closing_balance'  => $prevBal + $amount,
                     'description'      => "Party Transfer from {$sourceName} (Ref: {$tvid})" . ($remarks ? " - {$remarks}" : ""),
                 ]);
             } else {
-                $latestLedger = VendorLedger::where('vendor_id', $request->destination_party_id)->latest()->first();
+                $latestLedger = VendorLedger::where('vendor_id', $request->destination_party_id)->latest('id')->first();
                 $prevBal = $latestLedger ? $latestLedger->closing_balance : (\App\Models\Vendor::find($request->destination_party_id)->opening_balance ?? 0);
                 VendorLedger::create([
                     'vendor_id'        => $request->destination_party_id,
-                    'admin_or_user_id' => auth()->id(),
+                    'admin_or_user_id' => auth()->id() ?? 1,
                     'previous_balance' => $prevBal,
                     'opening_balance'  => 0,
                     'closing_balance'  => $prevBal + $amount,

@@ -309,15 +309,29 @@
             <table class="items-table" style="margin: 4px 0;">
                 <thead>
                     <tr>
-                        <th style="width: 50%; font-size: 10px;">Invoice #</th>
-                        <th style="width: 50%; text-align: right; font-size: 10px;">Allocated</th>
+                        <th style="width: 28%; font-size: 10px;">Invoice #</th>
+                        <th style="width: 24%; text-align: right; font-size: 10px;">Bill Total</th>
+                        <th style="width: 24%; text-align: right; font-size: 10px;">Paid Now</th>
+                        <th style="width: 24%; text-align: right; font-size: 10px;">Remaining</th>
                     </tr>
                 </thead>
                 <tbody>
                     @foreach($allocations as $alloc)
+                        @php
+                            $saleNet = $alloc->sale ? (float) $alloc->sale->total_net : null;
+                            $saleDue = $alloc->sale ? (float) $alloc->sale->due_amount : null;
+                        @endphp
                         <tr>
-                            <td style="font-size: 10.5px;">{{ $alloc->invoice_no }}</td>
-                            <td class="text-end font-monospace" style="font-size: 10.5px;">{{ number_format($alloc->amount, 2) }}</td>
+                            <td style="font-size: 10px;">{{ $alloc->invoice_no }}</td>
+                            <td class="text-end font-monospace" style="font-size: 10px;">
+                                {{ $saleNet !== null ? number_format($saleNet, 2) : '—' }}
+                            </td>
+                            <td class="text-end font-monospace" style="font-size: 10px; font-weight: bold;">
+                                {{ number_format($alloc->amount, 2) }}
+                            </td>
+                            <td class="text-end font-monospace" style="font-size: 10px; font-weight: bold; color: {{ ($saleDue ?? 0) > 0 ? '#b91c1c' : '#15803d' }};">
+                                {{ $saleDue !== null ? number_format($saleDue, 2) : '0.00' }}
+                            </td>
                         </tr>
                     @endforeach
                 </tbody>
