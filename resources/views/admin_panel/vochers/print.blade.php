@@ -284,7 +284,7 @@
 
         <!-- Summary -->
         @php
-            $balanceAfter = $previousBalance - $voucher->total_amount;
+            $remBalance = isset($balanceAfter) ? $balanceAfter : ($previousBalance - $voucher->total_amount);
         @endphp
         <table class="summary-table">
             <tr>
@@ -297,9 +297,32 @@
             </tr>
             <tr class="balance-row">
                 <td>Balance Remaining</td>
-                <td class="text-end">{{ number_format(abs($balanceAfter), 2) }} {{ $balanceAfter >= 0 ? 'Dr' : 'Cr' }}</td>
+                <td class="text-end">{{ number_format(abs($remBalance), 2) }} {{ $remBalance >= 0 ? 'Dr' : 'Cr' }}</td>
             </tr>
         </table>
+
+        @if(isset($allocations) && $allocations->count() > 0)
+            <div class="divider"></div>
+            <div style="font-size: 11px; font-weight: bold; margin-bottom: 4px; text-transform: uppercase;">
+                Invoice Allocations (Bill-by-Bill):
+            </div>
+            <table class="items-table" style="margin: 4px 0;">
+                <thead>
+                    <tr>
+                        <th style="width: 50%; font-size: 10px;">Invoice #</th>
+                        <th style="width: 50%; text-align: right; font-size: 10px;">Allocated</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach($allocations as $alloc)
+                        <tr>
+                            <td style="font-size: 10.5px;">{{ $alloc->invoice_no }}</td>
+                            <td class="text-end font-monospace" style="font-size: 10.5px;">{{ number_format($alloc->amount, 2) }}</td>
+                        </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        @endif
 
         <div class="divider"></div>
 

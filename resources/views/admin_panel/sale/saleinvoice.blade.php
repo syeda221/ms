@@ -19,89 +19,93 @@
 
     <style>
         :root {
-            --primary-color: #000;
-            --accent-color: #000;
-            --border-color: #000;
-            --text-color: #000;
+            --primary-color: #1a365d;
+            --accent-color: #0284c7;
+            --border-color: #cbd5e1;
+            --text-color: #0f172a;
         }
 
         body {
-            background-color: #f8f9fa;
-            color: #000;
+            background-color: #f1f5f9;
+            color: #0f172a;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            font-size: 12px;
+            font-size: 13px;
             margin: 0;
             padding: 0;
             -webkit-print-color-adjust: exact;
             print-color-adjust: exact;
         }
 
-        /* Pure black override for all text elements */
-        .text-primary, .text-danger, .text-success, .text-warning, .text-info, .text-secondary, .text-muted, .text-dark {
-            color: #000 !important;
-        }
-
         /* Screen Layout */
         .invoice-container {
             max-width: 210mm;
-            margin: 10px auto;
+            margin: 15px auto;
             background: #fff;
-            padding: 20px;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            padding: 24px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            border-radius: 8px;
             min-height: 297mm;
             position: relative;
-            color: #000;
+            color: #0f172a;
         }
 
         .company-info {
             text-align: center;
             margin-bottom: 12px;
-            color: #000;
+            color: #0f172a;
         }
 
         .company-name {
-            font-size: 24px;
+            font-size: 26px;
             font-weight: 800;
-            color: #000;
+            color: #1a365d;
+            margin-bottom: 3px;
+            letter-spacing: -0.01em;
+        }
+
+        .company-subtitle {
+            font-size: 13px;
+            color: #334155;
+            font-weight: 500;
             margin-bottom: 2px;
-            letter-spacing: 0.5px;
         }
 
         .invoice-title {
             text-align: center;
-            font-size: 18px;
+            font-size: 19px;
             font-weight: 800;
             text-transform: uppercase;
-            color: #000;
-            margin: 12px 0 16px 0;
-            letter-spacing: 1.5px;
+            color: #0284c7;
+            margin: 14px 0 18px 0;
+            letter-spacing: 2.5px;
         }
 
         .info-box {
-            border: 1px solid #cbd5e1;
+            border: 1px solid #94a3b8;
             padding: 10px 14px;
             height: 100%;
             border-radius: 6px;
             background-color: #fff;
-            color: #000;
+            color: #0f172a;
         }
 
         .info-box-header {
-            font-weight: 700;
-            border-bottom: 1px solid #cbd5e1;
+            font-weight: 800;
+            border-bottom: 1.5px solid #cbd5e1;
             margin-bottom: 8px;
             padding-bottom: 4px;
-            color: #000;
-            font-size: 11px;
+            color: #1e293b;
+            font-size: 12px;
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
 
         .info-label {
-            font-weight: 600;
-            color: #000;
+            font-weight: 700;
+            color: #334155;
             min-width: 65px;
             display: inline-block;
+            font-size: 13px;
         }
 
         .invoice-table {
@@ -111,34 +115,39 @@
         }
 
         .invoice-table th {
-            background-color: #fff;
-            color: #000;
+            background-color: #1e293b !important;
+            color: #ffffff !important;
             font-weight: 700;
-            font-size: 10px;
-            padding: 5px 3px;
-            border: 1px solid #000;
+            font-size: 12px;
+            padding: 9px 8px;
+            border: 1px solid #1e293b;
             text-align: center;
             vertical-align: middle;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
         }
 
         .invoice-table td {
-            border: 1px solid #000;
-            padding: 4px 3px;
+            border: 1px solid #cbd5e1;
+            padding: 8px 8px;
             vertical-align: middle;
-            font-size: 10px;
-            color: #000;
+            font-size: 13px;
+            color: #0f172a;
         }
 
         .invoice-table tfoot td {
-            border: 1px solid #000;
-            padding: 4px 3px;
+            border: 1px solid #cbd5e1;
+            padding: 8px 8px;
             font-weight: bold;
-            font-size: 10px;
-            color: #000;
+            font-size: 13px;
+            color: #0f172a;
+            background-color: #f8fafc;
         }
 
         .invoice-table tbody tr:nth-of-type(even) {
-            background-color: #fff;
+            background-color: #f8fafc;
         }
 
         .text-end {
@@ -151,53 +160,55 @@
 
         .footer-section {
             margin-top: 20px;
-            border-top: 2px solid #000;
+            border-top: 2px solid #1e293b;
             padding-top: 10px;
         }
 
         .terms-box {
-            font-size: 11px;
-            color: #000;
+            font-size: 12.5px;
+            color: #334155;
         }
 
         .terms-box ul {
             padding-left: 20px;
             margin-bottom: 0;
-            color: #000;
+            color: #334155;
         }
 
         .terms-box li {
-            margin-bottom: 2px;
-            color: #000;
+            margin-bottom: 3px;
+            color: #334155;
         }
 
         .totals-table {
             width: 100%;
             border-collapse: collapse;
-            font-size: 12px;
-            color: #000;
+            font-size: 13px;
+            color: #0f172a;
         }
 
         .totals-table td {
-            padding: 4px 8px;
-            border-bottom: 1px solid #eee;
-            color: #000;
+            padding: 5px 6px;
+            border-bottom: 1px solid #f1f5f9;
+            color: #0f172a;
         }
 
         .totals-table .total-row td {
-            border-top: 2px solid #000;
+            border-top: 2px solid #1e293b;
             font-weight: bold;
-            font-size: 14px;
-            color: #000;
+            font-size: 15px;
+            color: #0f172a;
         }
 
         .signature-area {
             margin-top: 40px;
-            border-top: 1px solid #000;
+            border-top: 1.5px solid #1e293b;
             width: 180px;
             text-align: center;
             padding-top: 5px;
-            color: #000;
+            color: #1e293b;
+            font-weight: 600;
+            font-size: 12px;
         }
 
         .print-btn-container {
@@ -450,16 +461,20 @@
             <div class="company-info">
 
                 <div class="company-name">
-                    {{ \App\Models\Setting::get('company_name', 'prowave technogies') }}
+                    {{ \App\Models\Setting::get('company_name', 'NR COLD DEPO') }}
                 </div>
 
-                <div style="font-size: 12px;">
-                    {{ \App\Models\Setting::get('company_address', 'Hyderabad') }}
+                @if(\App\Models\Setting::get('company_address'))
+                <div class="company-subtitle">
+                    {{ \App\Models\Setting::get('company_address') }}
                 </div>
+                @endif
 
-                <p>
-                    {{ \App\Models\Setting::get('company_phone', '0327-9226901') }}
-                </p>
+                @if(\App\Models\Setting::get('company_phone'))
+                <div class="company-subtitle">
+                    {{ \App\Models\Setting::get('company_phone') }}
+                </div>
+                @endif
 
             </div>
 
@@ -467,7 +482,7 @@
 
 
         <div class="invoice-title">
-            {{ ($isEstimate ?? false) ? 'Estimate' : 'Sales Invoice' }}
+            {{ ($isEstimate ?? false) ? 'Estimate' : 'SALES INVOICE' }}
         </div>
 
 
@@ -489,7 +504,7 @@
 
                         @if($sale->customer_relation?->customer_id)
 
-                            <div style="font-size: 11px; color: #555;">
+                            <div style="font-size: 11.5px; color: #64748b; margin-bottom: 2px;">
                                 Code:
                                 <strong>
                                     {{ $sale->customer_relation->customer_id }}
@@ -513,7 +528,7 @@
                                 Address:
                             </span>
 
-                            <span style="font-size:11px;">
+                            <span>
                                 {{ $sale->customer_relation->address ?? '—' }}
                             </span>
                         </div>
@@ -523,7 +538,7 @@
                                 Mob:
                             </span>
 
-                            <span style="font-size:11px;">
+                            <span>
                                 {{ $sale->customer_relation->mobile ?? '—' }}
                             </span>
                         </div>
@@ -799,7 +814,7 @@
                         </td>
 
                         <td class="text-start">
-                            <div style="font-weight: 700; color: #000; font-size: 11px;">{{ $productTitle }}</div>
+                            <div style="font-weight: 700; color: #0f172a; font-size: 13px;">{{ $productTitle }}</div>
 
                             @php
                                 $subDescriptions = [];
@@ -832,10 +847,10 @@
 
 
                             @if(!empty($subDescriptions) && count($subDescriptions) > 0)
-                                <div style="font-size: 10px; color: #1e293b; margin-top: 2px; padding-left: 2px;">
+                                <div style="font-size: 11.5px; color: #475569; margin-top: 2px; padding-left: 2px;">
                                     @foreach($subDescriptions as $sd)
                                         @if(trim($sd))
-                                            <div style="line-height: 1.4;"><span style="color: #000; margin-right: 4px; font-weight: bold;">•</span>{{ trim($sd) }}</div>
+                                            <div style="line-height: 1.4;"><span style="color: #1e293b; margin-right: 4px; font-weight: bold;">•</span>{{ trim($sd) }}</div>
                                         @endif
                                     @endforeach
                                 </div>
@@ -1238,42 +1253,29 @@
 
                 <div class="terms-box pt-2">
 
-                    <p class="fw-bold mb-1">
+                    <p class="fw-bold mb-1" style="font-size: 12.5px; color: #1e293b;">
                         Terms & Conditions:
                     </p>
 
-                    <ul style="font-size: 10px;">
+                    <ul style="font-size: 12px; color: #334155; padding-left: 18px; margin-bottom: 0;">
 
                         @php
-
-                            $invoiceTerms =
-                                \App\Models\Setting::get(
-                                    'invoice_terms',
-                                    "10% will be deducted on return of purchase goods within 7 days.\nLoose & Water Soak products will not be RETURNED.\nPlease bring this invoice for any returns or exchanges."
-                                );
-
-                            $termLines =
-                                explode("\n", $invoiceTerms);
-
+                            $invoiceTerms = \App\Models\Setting::get('invoice_terms', '');
+                            if (empty($invoiceTerms) || str_contains($invoiceTerms, 'Payment due within 30 days') || str_contains($invoiceTerms, '10% will be deducted')) {
+                                $invoiceTerms = "خریدا ہوا مال واپس اور تبدیل ہوسکتاہے بشرطیکہ خراب نہ ہو۔ مال کی کمی بیشی کی صورت میں 24 گھنٹوں کے اندر رابطہ کریں۔ شکریہ";
+                            }
+                            $termLines = explode("\n", $invoiceTerms);
                         @endphp
 
-
                         @foreach($termLines as $line)
-
                             @if(trim($line))
-
-                                <li>
-                                    {{ trim($line) }}
-                                </li>
-
+                                <li style="margin-bottom: 3px;">{{ trim($line) }}</li>
                             @endif
-
                         @endforeach
 
                     </ul>
 
                 </div>
-
 
                 <div class="mt-4 pt-2">
 
@@ -1281,12 +1283,8 @@
                         Authorized Signature
                     </div>
 
-                    <div class="small text-muted mt-1"
-                        style="font-size: 10px;">
-
-                        Printed on:
-                        {{ date('d/m/Y h:i A') }}
-
+                    <div class="small text-muted mt-1" style="font-size: 11px; color: #64748b;">
+                        Printed on: {{ date('d/m/Y h:i A') }}
                     </div>
 
                 </div>
@@ -1469,82 +1467,58 @@
 
 
                         @php
-
-                            $finalPayable =
-                                $netBill
-                                -
-                                $exchangeReturnedAmount;
-
+                            $finalPayable = $netBill - $exchangeReturnedAmount;
+                            $paidAmt = (float)($sale->paid_amount ?? 0);
+                            $dueAmt = (float)($sale->due_amount ?? max(0, $finalPayable - $paidAmt));
+                            $prevBal = (float)($previousBalance ?? 0);
+                            $closingBalance = $prevBal + $finalPayable - $paidAmt;
                         @endphp
 
-
-                        <tr>
-
-                            <td class="fw-bold text-dark fs-6"
-                                style="border-top: 2px solid #34495e; padding-top: 8px;">
-
-                                {{
-                                    $finalPayable < 0
-                                        ? 'Refund To Customer'
-                                        : 'Grand Total'
-                                }}
-
+                        <tr style="border-top: 2.5px solid #1e293b;">
+                            <td class="fw-bold" style="font-size: 16px; color: #0f172a; padding: 7px 0 5px 0;">
+                                Net Payable
                             </td>
-
-
-                            <td class="text-end fw-bold text-dark fs-6"
-                                style="border-top: 2px solid #34495e; padding-top: 8px;">
-
-                                {{
-                                    number_format(
-                                        abs($finalPayable),
-                                        2
-                                    )
-                                }}
-
-                            </td>
-
-                        </tr>
-
-                        <tr>
-                            <td class="text-success fw-bold" style="padding-top: 5px;">
-                                Received Amount
-                            </td>
-                            <td class="text-end text-success fw-bold font-monospace" style="padding-top: 5px;">
-                                Rs. {{ number_format($sale->paid_amount ?? 0, 2) }}
+                            <td class="text-end fw-bold font-monospace" style="font-size: 16px; color: #0f172a; padding: 7px 0 5px 0;">
+                                {{ number_format(abs($finalPayable), 2) }}
                             </td>
                         </tr>
 
-                        @if(isset($previousBalance) && abs($previousBalance) > 0)
+                        @if(abs($prevBal) > 0)
                         <tr>
-                            <td class="text-secondary" style="padding-top: 3px;">
-                                Previous Balance
+                            <td style="font-size: 13px; color: #475569; padding: 3px 0;">
+                                Prev Bal
                             </td>
-                            <td class="text-end text-secondary font-monospace" style="padding-top: 3px;">
-                                Rs. {{ number_format($previousBalance, 2) }}
+                            <td class="text-end font-monospace" style="font-size: 13px; color: #475569; padding: 3px 0;">
+                                {{ number_format(abs($prevBal), 2) }} {{ $prevBal >= 0 ? 'Dr' : 'Cr' }}
                             </td>
                         </tr>
                         @endif
 
                         <tr>
-                            <td class="text-danger fw-bold" style="padding-top: 3px;">
-                                Current Bill Due
+                            <td style="font-size: 13px; color: #475569; padding: 3px 0;">
+                                Paid
                             </td>
-                            <td class="text-end text-danger fw-bold font-monospace" style="padding-top: 3px;">
-                                Rs. {{ number_format($sale->due_amount ?? 0, 2) }}
+                            <td class="text-end font-monospace" style="font-size: 13px; color: #475569; padding: 3px 0;">
+                                {{ number_format($paidAmt, 2) }}
                             </td>
                         </tr>
 
-                        @php
-                            $totalNetOutstanding = ($previousBalance ?? 0) + ($sale->due_amount ?? 0);
-                        @endphp
-                        @if(isset($previousBalance) && abs($previousBalance) > 0)
+                        @if(abs($prevBal) > 0)
                         <tr style="border-top: 1px solid #cbd5e1;">
-                            <td class="fw-bold" style="padding-top: 4px; color: #0f172a;">
-                                Total Due (Kul Baqaya)
+                            <td class="fw-bold" style="font-size: 14.5px; color: #0f172a; padding: 6px 0;">
+                                Closing Balance
                             </td>
-                            <td class="text-end fw-bold font-monospace" style="padding-top: 4px; color: #0f172a;">
-                                Rs. {{ number_format($totalNetOutstanding, 2) }}
+                            <td class="text-end fw-bold font-monospace" style="font-size: 14.5px; color: #0f172a; padding: 6px 0;">
+                                {{ number_format(abs($closingBalance), 2) }} {{ $closingBalance >= 0 ? 'Dr' : 'Cr' }}
+                            </td>
+                        </tr>
+                        @else
+                        <tr style="border-top: 1px solid #cbd5e1;">
+                            <td class="fw-bold" style="font-size: 14.5px; color: #0f172a; padding: 6px 0;">
+                                Remaining / Due
+                            </td>
+                            <td class="text-end fw-bold font-monospace" style="font-size: 14.5px; color: #0f172a; padding: 6px 0;">
+                                {{ number_format($dueAmt, 2) }}
                             </td>
                         </tr>
                         @endif
@@ -2378,15 +2352,16 @@
             style.id = 'a4-print-style';
             style.innerHTML = `
                 @media print {
-                    @page { size: auto; margin: 10mm; }
-                    .screen-only { display: block !important; }
+                    @page { size: auto; margin: 8mm; }
+                    .screen-only { display: block !important; box-shadow: none !important; margin: 0 !important; max-width: 100% !important; padding: 0 !important; }
                     .receipt-container { display: none !important; }
-                    body { width: auto !important; margin: 0 !important; padding: 0 !important; color: #000 !important; }
-                    * { color: #000 !important; -webkit-text-fill-color: #000 !important; }
-                    .text-primary, .text-danger, .text-success, .text-warning, .text-info, .text-secondary, .text-muted, .text-dark, .info-label, .invoice-title, .company-name, .terms-box {
-                        color: #000 !important;
-                        -webkit-text-fill-color: #000 !important;
-                    }
+                    body { width: 100% !important; margin: 0 !important; padding: 0 !important; background: #fff !important; color: #0f172a !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+                    .company-name { color: #1a365d !important; -webkit-print-color-adjust: exact !important; }
+                    .invoice-title { color: #0284c7 !important; -webkit-print-color-adjust: exact !important; }
+                    .invoice-table th { background-color: #1e293b !important; color: #ffffff !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+                    .invoice-table td { border-color: #cbd5e1 !important; color: #0f172a !important; }
+                    .invoice-table tbody tr:nth-of-type(even) { background-color: #f8fafc !important; -webkit-print-color-adjust: exact !important; }
+                    .info-box { border-color: #94a3b8 !important; }
                 }
             `;
             document.head.appendChild(style);
