@@ -44,7 +44,7 @@
             padding: 24px;
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
             border-radius: 8px;
-            min-height: 297mm;
+            min-height: auto;
             position: relative;
             color: #0f172a;
         }
@@ -218,205 +218,101 @@
             z-index: 1000;
         }
 
-        /* Thermal Receipt */
+        /* Thermal Receipt - hidden on A4 Invoice */
         .receipt-container {
-            display: none;
+            display: none !important;
+            height: 0 !important;
+            min-height: 0 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            overflow: hidden !important;
         }
 
         @media print {
-
             @page {
-                size: 80mm auto;
-                margin: 0;
+                size: A4 portrait;
+                margin: 6mm 8mm;
             }
 
-            body {
+            html, body {
                 width: 100% !important;
+                height: auto !important;
+                min-height: 0 !important;
                 margin: 0 !important;
                 padding: 0 !important;
                 background: #fff !important;
-                color: #000 !important;
-                font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif !important;
-            }
-
-            .print-btn-container,
-            .no-print,
-            .screen-only {
-                display: none !important;
-            }
-
-            .receipt-container {
-                display: block !important;
-                box-shadow: none !important;
-                border: none !important;
-                margin: 0 auto !important;
-                padding: 3mm 2mm 5mm 2mm !important;
-                width: 76mm !important;
-                max-width: 76mm !important;
-                background: #fff !important;
-                color: #000 !important;
-                font-size: 11px !important;
-                line-height: 1.3 !important;
-                word-wrap: break-word !important;
-                overflow-wrap: break-word !important;
-            }
-
-            .receipt-container h1,
-            .receipt-container h2,
-            .receipt-container h3,
-            .receipt-container p {
-                margin: 0;
-                padding: 0;
-            }
-
-            .receipt-container .company-name {
-                font-size: 18px !important;
-                font-weight: 700 !important;
-                text-align: center !important;
-                text-transform: uppercase !important;
-                letter-spacing: 0.5px !important;
-                margin-bottom: 2px !important;
-                color: #000 !important;
-            }
-
-            .receipt-container .company-info {
-                font-size: 11px !important;
-                text-align: center !important;
-                color: #000 !important;
-                font-weight: 400 !important;
-                line-height: 1.35 !important;
-                margin-bottom: 4px !important;
-            }
-
-            .receipt-container .policy-banner {
-                background-color: #000 !important;
-                color: #fff !important;
-                text-align: center !important;
-                font-size: 10px !important;
-                font-weight: bold !important;
-                padding: 3px 5px !important;
-                margin: 4px 0 !important;
-                border-radius: 3px !important;
-                text-transform: uppercase !important;
-                letter-spacing: 0.5px !important;
+                color: #0f172a !important;
                 -webkit-print-color-adjust: exact !important;
                 print-color-adjust: exact !important;
             }
 
-            .receipt-container .divider {
-                border-top: 1px dashed #000 !important;
-                margin: 4px 0 !important;
+            .print-btn-container,
+            .no-print {
+                display: none !important;
             }
 
-            .receipt-container .meta-grid {
-                display: flex !important;
-                flex-direction: column !important;
-                gap: 2px !important;
-                margin-bottom: 2px !important;
-                color: #000 !important;
+            .receipt-container {
+                display: none !important;
+                height: 0 !important;
+                min-height: 0 !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                overflow: hidden !important;
             }
 
-            .receipt-container .meta-row {
-                display: flex !important;
-                justify-content: space-between !important;
-                font-size: 10.5px !important;
-                font-weight: 400 !important;
-            }
-
-            .receipt-container .items-table {
+            .invoice-container,
+            .screen-only {
+                display: block !important;
+                box-shadow: none !important;
+                border: none !important;
+                border-radius: 0 !important;
+                margin: 0 auto !important;
+                max-width: 100% !important;
                 width: 100% !important;
-                border-collapse: collapse !important;
-                font-size: 10.5px !important;
-                color: #000 !important;
-                margin: 3px 0 !important;
+                padding: 0 !important;
+                min-height: 0 !important;
+                height: auto !important;
             }
 
-            .receipt-container .items-table th {
-                border-top: 1px dashed #000 !important;
-                border-bottom: 1px dashed #000 !important;
-                padding: 3px 1px !important;
-                text-align: left !important;
-                font-weight: 700 !important;
-                font-size: 10px !important;
-                text-transform: uppercase !important;
+            .company-name {
+                color: #1a365d !important;
+                -webkit-print-color-adjust: exact !important;
             }
 
-            .receipt-container .items-table td {
-                padding: 3px 1px !important;
-                vertical-align: top !important;
-                border-bottom: 1px dashed #ccc !important;
-                font-size: 10.5px !important;
+            .invoice-title {
+                color: #0284c7 !important;
+                -webkit-print-color-adjust: exact !important;
             }
 
-            .receipt-container .item-name {
-                font-weight: 600 !important;
-                font-size: 10.5px !important;
-                color: #000 !important;
-                display: block !important;
+            .invoice-table th {
+                background-color: #1e293b !important;
+                color: #ffffff !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
             }
 
-            .receipt-container .item-variant {
-                font-size: 9.5px !important;
-                color: #222 !important;
-                font-weight: 400 !important;
-                margin-top: 1px !important;
-                display: block !important;
+            .invoice-table td {
+                border-color: #cbd5e1 !important;
+                color: #0f172a !important;
             }
 
-            .receipt-container .totals-section {
-                font-size: 10.5px !important;
-                margin-top: 4px !important;
-                color: #000 !important;
+            .invoice-table tbody tr:nth-of-type(even) {
+                background-color: #f8fafc !important;
+                -webkit-print-color-adjust: exact !important;
             }
 
-            .receipt-container .tot-row {
-                display: flex !important;
-                justify-content: space-between !important;
-                padding: 1.5px 0 !important;
+            .info-box {
+                border-color: #94a3b8 !important;
             }
 
-            .receipt-container .tot-row.grand-total {
-                font-size: 12px !important;
-                font-weight: 800 !important;
-                margin: 3px 0 !important;
-                padding: 4px 0 !important;
-                border-top: 1.5px solid #000 !important;
-                border-bottom: 1.5px solid #000 !important;
-                color: #000 !important;
+            .footer-section {
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
             }
 
-            .receipt-container .balance-section {
-                font-size: 10.5px !important;
-                margin-top: 3px !important;
-                border-top: 1px dashed #000 !important;
-                padding-top: 3px !important;
-            }
-
-            .receipt-container .balance-section .tot-row.closing-bal {
-                font-weight: 700 !important;
-                background-color: #f8f9fa !important;
-                padding: 3px 2px !important;
-                border: 1px solid #000 !important;
-                margin-top: 2px !important;
-            }
-
-            .receipt-container .footer {
-                text-align: center !important;
-                margin-top: 10px !important;
-                color: #000 !important;
-            }
-
-            .receipt-container .footer p {
-                font-size: 10px !important;
-                font-weight: 600 !important;
-                margin-bottom: 2px !important;
-            }
-
-            .receipt-container .footer .soft-credit {
-                font-size: 8.5px !important;
-                color: #444 !important;
-                margin-top: 2px !important;
-                font-weight: 400 !important;
+            .invoice-table tr {
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
             }
         }
     </style>
@@ -2348,32 +2244,7 @@
 
         function printA4() {
             document.title = "{{ addslashes($pageTitle) }}";
-            let style = document.createElement('style');
-            style.id = 'a4-print-style';
-            style.innerHTML = `
-                @media print {
-                    @page { size: auto; margin: 8mm; }
-                    .screen-only { display: block !important; box-shadow: none !important; margin: 0 !important; max-width: 100% !important; padding: 0 !important; }
-                    .receipt-container { display: none !important; }
-                    body { width: 100% !important; margin: 0 !important; padding: 0 !important; background: #fff !important; color: #0f172a !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-                    .company-name { color: #1a365d !important; -webkit-print-color-adjust: exact !important; }
-                    .invoice-title { color: #0284c7 !important; -webkit-print-color-adjust: exact !important; }
-                    .invoice-table th { background-color: #1e293b !important; color: #ffffff !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-                    .invoice-table td { border-color: #cbd5e1 !important; color: #0f172a !important; }
-                    .invoice-table tbody tr:nth-of-type(even) { background-color: #f8fafc !important; -webkit-print-color-adjust: exact !important; }
-                    .info-box { border-color: #94a3b8 !important; }
-                }
-            `;
-            document.head.appendChild(style);
-            
             window.print();
-            
-            setTimeout(() => {
-                let s = document.getElementById('a4-print-style');
-                if (s) {
-                    s.remove();
-                }
-            }, 500);
         }
 
         window.addEventListener('beforeprint', function() {

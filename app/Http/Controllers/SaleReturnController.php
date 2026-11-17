@@ -489,15 +489,11 @@ class SaleReturnController extends Controller
                 }
             }
 
-            // Create Journal Voucher (Credit Note)
+            // Create Journal Voucher (Credit Note) & Sync to Customer Ledger
             $transactionService = app(\App\Services\TransactionService::class);
             if (method_exists($transactionService, 'createSaleReturnVoucher')) {
                 $transactionService->createSaleReturnVoucher($return);
             }
-
-            // Update Customer Ledger (if exists)
-            // Sale Return increases customer balance (they owe less or we owe them)
-            $balanceChange = $netAmount - $totalPaid;
 
             DB::commit();
 

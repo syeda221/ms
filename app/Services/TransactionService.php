@@ -365,6 +365,65 @@ class TransactionService
             // 4. Create Voucher
             $this->voucherService->createVoucher($voucherData, $lines, auth()->id());
 
+            // 5. SYNC TO VENDOR LEDGER
+            if ($return->vendor_id) {
+                $lastEntry = \App\Models\VendorLedger::where('vendor_id', $return->vendor_id)
+                    ->lockForUpdate()
+                    ->orderBy('id', 'desc')
+                    ->first();
+
+                $prevBal = $lastEntry ? (float)$lastEntry->closing_balance : (float)(
+                    \App\Models\Vendor::find($return->vendor_id)->opening_balance ?? 0
+                );
+                $creditToVendor = (float)$return->net_amount - (float)($return->paid ?? 0);
+                $newBal = $prevBal - $creditToVendor;
+
+                \App\Models\VendorLedger::create([
+                    'vendor_id'        => $return->vendor_id,
+                    'admin_or_user_id' => auth()->id() ?? 1,
+                    'description'      => "Purchase Return #{$return->return_invoice}",
+                    'previous_balance' => $prevBal,
+                    'closing_balance'  => $newBal,
+                    'opening_balance'  => 0,
+                ]);
+
+                $vendor = \App\Models\Vendor::find($return->vendor_id);
+                if ($vendor) {
+                    $vendor->previous_balance = $newBal;
+                    $vendor->save();
+                }
+
+                // Adjust Purchase Dues
+                $remainingCredit = $creditToVendor;
+                if ($return->purchase_id && $remainingCredit > 0) {
+                    $targetPur = \App\Models\Purchase::find($return->purchase_id);
+                    if ($targetPur && (float)$targetPur->due_amount > 0) {
+                        $adj = min((float)$targetPur->due_amount, $remainingCredit);
+                        $targetPur->due_amount -= $adj;
+                        $targetPur->paid_amount += $adj;
+                        $targetPur->save();
+                        $remainingCredit -= $adj;
+                    }
+                }
+
+                if ($remainingCredit > 0) {
+                    $pendingPurchases = \App\Models\Purchase::where('vendor_id', $return->vendor_id)
+                        ->where('due_amount', '>', 0)
+                        ->orderBy('purchase_date', 'asc')
+                        ->orderBy('id', 'asc')
+                        ->get();
+
+                    foreach ($pendingPurchases as $pp) {
+                        if ($remainingCredit <= 0) break;
+                        $adj = min((float)$pp->due_amount, $remainingCredit);
+                        $pp->due_amount -= $adj;
+                        $pp->paid_amount += $adj;
+                        $pp->save();
+                        $remainingCredit -= $adj;
+                    }
+                }
+            }
+
             \Log::info("Purchase Return Voucher Created for Invoice #{$return->return_invoice}");
 
         } catch (\Exception $e) {
@@ -417,6 +476,71 @@ class TransactionService
 
             // 4. Create Voucher
             $this->voucherService->createVoucher($voucherData, $lines, auth()->id());
+
+            // 5. SYNC TO CUSTOMER LEDGER & UPDATE OUTSTANDING BALANCES
+            if ($return->customer_id) {
+                $creditToCustomer = (float)$return->net_amount - (float)($return->paid ?? 0);
+                if ($creditToCustomer > 0) {
+                    $lastEntry = \App\Models\CustomerLedger::where('customer_id', $return->customer_id)
+                        ->lockForUpdate()
+                        ->orderBy('id', 'desc')
+                        ->first();
+
+                    $prevBal = $lastEntry ? (float)$lastEntry->closing_balance : (float)(
+                        \App\Models\Customer::find($return->customer_id)->opening_balance ?? 0
+                    );
+                    $newBal = $prevBal - $creditToCustomer;
+
+                    $saleRef = $return->sale ? " for Invoice #{$return->sale->invoice_no}" : "";
+                    \App\Models\CustomerLedger::create([
+                        'customer_id'      => $return->customer_id,
+                        'admin_or_user_id' => auth()->id() ?? 1,
+                        'description'      => "Sale Return #{$return->return_invoice}{$saleRef}",
+                        'previous_balance' => $prevBal,
+                        'closing_balance'  => $newBal,
+                        'opening_balance'  => 0,
+                    ]);
+
+                    $cust = \App\Models\Customer::find($return->customer_id);
+                    if ($cust) {
+                        $cust->previous_balance = $newBal;
+                        $cust->save();
+                    }
+
+                    // 6. Adjust Pending Invoice Dues (FIFO)
+                    $remainingCredit = $creditToCustomer;
+                    if ($return->sale_id && $remainingCredit > 0) {
+                        $targetSale = \App\Models\Sale::find($return->sale_id);
+                        if ($targetSale && (float)$targetSale->due_amount > 0) {
+                            $adj = min((float)$targetSale->due_amount, $remainingCredit);
+                            $targetSale->due_amount -= $adj;
+                            $targetSale->paid_amount += $adj;
+                            $targetSale->payment_status = $targetSale->due_amount <= 0 ? 'paid' : 'partial';
+                            $targetSale->save();
+                            $remainingCredit -= $adj;
+                        }
+                    }
+
+                    if ($remainingCredit > 0) {
+                        $pendingSales = \App\Models\Sale::where('customer_id', $return->customer_id)
+                            ->whereNotIn('sale_status', ['cancelled', 'returned'])
+                            ->where('due_amount', '>', 0)
+                            ->orderBy('created_at', 'asc')
+                            ->orderBy('id', 'asc')
+                            ->get();
+
+                        foreach ($pendingSales as $ps) {
+                            if ($remainingCredit <= 0) break;
+                            $adj = min((float)$ps->due_amount, $remainingCredit);
+                            $ps->due_amount -= $adj;
+                            $ps->paid_amount += $adj;
+                            $ps->payment_status = $ps->due_amount <= 0 ? 'paid' : 'partial';
+                            $ps->save();
+                            $remainingCredit -= $adj;
+                        }
+                    }
+                }
+            }
 
             \Log::info("Sale Return Voucher Created for Invoice #{$return->return_invoice}");
 
