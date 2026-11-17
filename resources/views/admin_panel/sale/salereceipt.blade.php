@@ -403,8 +403,12 @@
                     <tr>
                         <td style="width: 6%;">{{ $loop->iteration }}</td>
                         <td style="width: 53%;">
-                            <span class="item-name">{{ $item['item_name'] }}</span>
-                            @if($variantStr && $variantStr !== '{' && trim($variantStr) !== '')
+                            @php
+                                $vName = trim($item['variant_name'] ?? '');
+                                $displayTitle = (!empty($vName) && $vName !== '-') ? $vName : $item['item_name'];
+                            @endphp
+                            <span class="item-name">{{ $displayTitle }}</span>
+                            @if($variantStr && $variantStr !== '{' && trim($variantStr) !== '' && (!$vName || !str_contains($vName, $variantStr)))
                                 <span class="item-variant">{{ $variantStr }}</span>
                             @endif
 

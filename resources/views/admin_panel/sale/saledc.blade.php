@@ -313,18 +313,16 @@
             <tbody>
                 @foreach ($saleItems as $item)
                     @php
-                        $vName = $item['variant_name'] ?? '';
-                        $vSize = (!empty($item['size_val']) && $item['size_val'] !== '-') ? $item['size_val'] : '';
-                        $vColor = (!empty($item['color_val']) && $item['color_val'] !== '-') ? $item['color_val'] : '';
+                        $vName = trim($item['variant_name'] ?? '');
+                        $vSize = (!empty($item['size_val']) && $item['size_val'] !== '-') ? trim($item['size_val']) : '';
+                        $vColor = (!empty($item['color_val']) && $item['color_val'] !== '-') ? trim($item['color_val']) : '';
                         
                         $vExtra = [];
-                        if ($vColor) $vExtra[] = $vColor;
+                        if ($vColor && (!$vName || !str_contains($vName, $vColor))) $vExtra[] = $vColor;
                         $vExtraStr = count($vExtra) > 0 ? ' (' . implode(', ', $vExtra) . ')' : '';
 
-                        $productTitle = $item['item_name'];
-                        if ($vName && strtolower(trim($vName)) !== strtolower(trim($productTitle))) {
-                            $productTitle .= ' — ' . $vName;
-                        }
+                        // If variant name exists, print ONLY the variant name (no base product name prefix)
+                        $productTitle = (!empty($vName) && $vName !== '-') ? $vName : $item['item_name'];
                         $productTitle .= $vExtraStr;
 
                         $dcBatchNo = $item['batch_no'] ?? null;

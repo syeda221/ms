@@ -661,19 +661,17 @@
                 @foreach ($saleItems as $item)
 
                     @php
-                        $vName = $item['variant_name'] ?? '';
-                        $vSize = (!empty($item['size_val']) && $item['size_val'] !== '-') ? $item['size_val'] : '';
-                        $vColor = (!empty($item['color_val']) && $item['color_val'] !== '-') ? $item['color_val'] : '';
+                        $vName = trim($item['variant_name'] ?? '');
+                        $vSize = (!empty($item['size_val']) && $item['size_val'] !== '-') ? trim($item['size_val']) : '';
+                        $vColor = (!empty($item['color_val']) && $item['color_val'] !== '-') ? trim($item['color_val']) : '';
                         
                         $vExtra = [];
-                        if ($vSize) $vExtra[] = $vSize;
-                        if ($vColor) $vExtra[] = $vColor;
+                        if ($vSize && (!$vName || !str_contains($vName, $vSize))) $vExtra[] = $vSize;
+                        if ($vColor && (!$vName || !str_contains($vName, $vColor))) $vExtra[] = $vColor;
                         $vExtraStr = count($vExtra) > 0 ? ' (' . implode(', ', $vExtra) . ')' : '';
 
-                        $productTitle = $item['item_name'];
-                        if ($vName && strtolower(trim($vName)) !== strtolower(trim($productTitle))) {
-                            $productTitle .= ' — ' . $vName;
-                        }
+                        // If variant name exists, print ONLY the variant name (no base product name prefix)
+                        $productTitle = (!empty($vName) && $vName !== '-') ? $vName : $item['item_name'];
                         $productTitle .= $vExtraStr;
 
                         $batchNo = $item['batch_no'] ?? '';
@@ -1887,19 +1885,17 @@
                         <td style="width: 53%;">
 
                             @php
-                                $tVName = $item['variant_name'] ?? '';
-                                $tVSize = (!empty($item['size_val']) && $item['size_val'] !== '-') ? $item['size_val'] : '';
-                                $tVColor = (!empty($item['color_val']) && $item['color_val'] !== '-') ? $item['color_val'] : '';
+                                $tVName = trim($item['variant_name'] ?? '');
+                                $tVSize = (!empty($item['size_val']) && $item['size_val'] !== '-') ? trim($item['size_val']) : '';
+                                $tVColor = (!empty($item['color_val']) && $item['color_val'] !== '-') ? trim($item['color_val']) : '';
                                 
                                 $tVExtra = [];
-                                if ($tVSize) $tVExtra[] = $tVSize;
-                                if ($tVColor) $tVExtra[] = $tVColor;
+                                if ($tVSize && (!$tVName || !str_contains($tVName, $tVSize))) $tVExtra[] = $tVSize;
+                                if ($tVColor && (!$tVName || !str_contains($tVName, $tVColor))) $tVExtra[] = $tVColor;
                                 $tVExtraStr = count($tVExtra) > 0 ? ' (' . implode(', ', $tVExtra) . ')' : '';
 
-                                $tProductTitle = $item['item_name'];
-                                if ($tVName && strtolower(trim($tVName)) !== strtolower(trim($tProductTitle))) {
-                                    $tProductTitle .= ' — ' . $tVName;
-                                }
+                                // If variant name exists, print ONLY the variant name (no base product name prefix)
+                                $tProductTitle = (!empty($tVName) && $tVName !== '-') ? $tVName : $item['item_name'];
                                 $tProductTitle .= $tVExtraStr;
                             @endphp
 
