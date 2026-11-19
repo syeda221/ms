@@ -983,14 +983,9 @@
             const variantsContainer = document.getElementById('variantsContainer');
             const variantsBody = document.getElementById('variantsBody');
 
-            const weightUnits = ['by_kg', 'by_gm', 'by_ton'];
             let variantMode = 'standard';
             let manualPrices = {}; // Keep track of manually overridden prices
             let manualNames = {}; // Keep track of manually overridden names
-
-            function isWeightUnit(unit) {
-                return weightUnits.includes(unit);
-            }
 
             function updateVariantMode() {
                 const currentUnit = unitDropdown ? unitDropdown.value : 'by_pieces';
