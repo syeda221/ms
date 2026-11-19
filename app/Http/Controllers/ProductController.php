@@ -534,7 +534,7 @@ class ProductController extends Controller
     public function view_store()
     {
         $categories = Category::select('id', 'name')->get();
-        $units = Unit::select('id', 'name')->get();
+        $units = Unit::all();
         $brands = Brand::select('id', 'name')->get();
 
         return view('admin_panel.product.create', compact('categories', 'units', 'brands'));
@@ -650,7 +650,7 @@ class ProductController extends Controller
             $purchasePricePerPiece = $m2PerPiece * $purchasePricePerM2;
             $purchasePricePerBox = $m2PerBox * $purchasePricePerM2;
 
-        } elseif (in_array($mode, ['by_cartons', 'by_bandal'])) {
+        } elseif (Product::isCartonMode($mode)) {
             // By Cartons Mode
             $piecesPerBox = (int) $request->pieces_per_box;
             if ($piecesPerBox <= 0) $piecesPerBox = 1;
@@ -777,7 +777,7 @@ class ProductController extends Controller
                             if ($isBase === 1) {
                                 $variantStockSum += $vStock;
                             }
-                        } elseif (in_array($mode, ['by_cartons', 'by_bandal'])) {
+                        } elseif (Product::isCartonMode($mode)) {
                             if ($isBase === 1 || $baseConvForCarton === null) {
                                 $baseConvForCarton = $vConvFactor;
                             }
@@ -821,13 +821,13 @@ class ProductController extends Controller
                 
                 if (count($variants) > 0) {
                     $totalStockQty = $variantStockSum;
-                    if (in_array($mode, ['by_cartons', 'by_bandal']) && $baseConvForCarton) {
+                    if (Product::isCartonMode($mode) && $baseConvForCarton) {
                         $piecesPerBox = (int)$baseConvForCarton;
                     }
                     $boxesQuantity = $piecesPerBox > 0 ? $totalStockQty / $piecesPerBox : $totalStockQty;
 
                     $baseVariant = collect($variants)->firstWhere('is_base_variant', 1) ?? $variants[0];
-                    if ($baseVariant && (in_array($mode, ['by_cartons', 'by_bandal']) || strtolower($baseVariant['unit'] ?? '') === 'carton')) {
+                    if ($baseVariant && (Product::isCartonMode($mode) || strtolower($baseVariant['unit'] ?? '') === 'carton')) {
                         $salePricePerPiece = (float)($baseVariant['sale_price'] ?? 0);
                         $purchasePricePerPiece = (float)($baseVariant['purch_price'] ?? 0);
                         $purchasePricePerBox = round($purchasePricePerPiece * $piecesPerBox, 2);
@@ -847,6 +847,10 @@ class ProductController extends Controller
                 }
             }
 
+            // Resolve unit_id
+            $matchedUnit = Unit::where('slug', $mode)->first();
+            $resolvedUnitId = $request->unit ?: ($matchedUnit ? $matchedUnit->id : null);
+
             // Create product
             $product = Product::create([
                 'creater_id' => $userId,
@@ -855,7 +859,7 @@ class ProductController extends Controller
                 'item_code' => $nextCode,
                 'item_name' => $request->product_name,
                 'barcode_path' => $request->barcode_path ?? rand(100000000000, 999999999999),
-                'unit_id' => $request->unit,
+                'unit_id' => $resolvedUnitId,
                 'brand_id' => $request->brand_id,
                 'model' => $request->model,
                 'image' => $imagePath,
@@ -1071,7 +1075,7 @@ class ProductController extends Controller
             $totalPrice = $totalStockQty * $salePricePerBox;
             $totalPurchasePrice = $totalStockQty * $purchasePricePerPiece;
 
-        } elseif (in_array($mode, ['by_cartons', 'by_bandal'])) {
+        } elseif (Product::isCartonMode($mode)) {
             // By Cartons Mode
             $piecesPerBox = (int) $request->pieces_per_box;
             if ($piecesPerBox <= 0) $piecesPerBox = 1;
@@ -1189,7 +1193,7 @@ class ProductController extends Controller
                         $vConvFactor = (float)($conv_factors[$i] ?? 0);
                         $isBase = (int)($is_bases[$i] ?? 0);
                         if ($vConvFactor <= 0) $vConvFactor = 1;
-                        if (in_array($mode, ['by_cartons', 'by_bandal']) && ($isBase === 1 || $baseConvForCarton === null)) {
+                        if (Product::isCartonMode($mode) && ($isBase === 1 || $baseConvForCarton === null)) {
                             $baseConvForCarton = $vConvFactor;
                         }
 
@@ -1218,7 +1222,7 @@ class ProductController extends Controller
                         ];
                     }
                 }
-                if (in_array($mode, ['by_cartons', 'by_bandal']) && $baseConvForCarton) {
+                if (Product::isCartonMode($mode) && $baseConvForCarton) {
                     $piecesPerBox = (int)$baseConvForCarton;
                     $baseVariant = collect($variants)->firstWhere('is_base_variant', 1) ?? $variants[0];
                     if ($baseVariant) {
@@ -1252,6 +1256,10 @@ class ProductController extends Controller
                 $final_color = Product::where('id', $id)->value('color');
             }
 
+            // Resolve unit_id
+            $matchedUnit = Unit::where('slug', $mode)->first();
+            $resolvedUnitId = $request->unit ?: ($matchedUnit ? $matchedUnit->id : null);
+
             Product::where('id', $id)->update([
                 'creater_id' => $userId,
                 'category_id' => $request->category_id,
@@ -1259,7 +1267,7 @@ class ProductController extends Controller
                 'item_code' => $request->item_code ?? Product::where('id', $id)->value('item_code'),
                 'item_name' => $request->product_name,
                 'barcode_path' => $request->barcode_path ?? rand(100000000000, 999999999999),
-                'unit_id' => $request->unit,
+                'unit_id' => $resolvedUnitId,
                 'brand_id' => $request->brand_id,
                 'model' => $request->model,
                 'image' => $imagePath,
@@ -1453,7 +1461,7 @@ class ProductController extends Controller
                             $updateData['price_per_m2'] = $pricePerM2;
                             $updateData['sale_price_per_box'] = $m2PerBox * $pricePerM2;
                         }
-                    } elseif (in_array($product->size_mode, ['by_cartons', 'by_bandal'])) {
+                    } elseif (Product::isCartonMode($product->size_mode)) {
                         $ppb = $product->pieces_per_box > 0 ? $product->pieces_per_box : 1;
 
                         if ($tradePrice !== null) {
@@ -1495,6 +1503,7 @@ class ProductController extends Controller
         $categories = Category::all();
         $subcategories = SubCategory::all();
         $brands = Brand::all();
+        $units = Unit::all();
 
         // Calculate current stock from WarehouseStock (the real source of truth)
         $totalPieces = $product->warehouseStocks->sum('total_pieces');
@@ -1616,7 +1625,7 @@ class ProductController extends Controller
 
         // Variants prices are stored and edited as per-piece (1 PCS) prices. Carton prices are computed live on page.
 
-        return view('admin_panel.product.edit', compact('product', 'categories', 'subcategories', 'brands', 'variants'));
+        return view('admin_panel.product.edit', compact('product', 'categories', 'subcategories', 'brands', 'variants', 'units'));
     }
 
     // ===== Barcode view =====
@@ -1637,7 +1646,7 @@ class ProductController extends Controller
             'brand_id' => 'required',
             'unit' => 'nullable',
             'model' => 'nullable', // Made nullable
-            'size_mode' => 'required|in:by_size,by_cartons,by_bandal,by_pieces,by_kg,by_meter,by_gm,by_feet,by_ton',
+            'size_mode' => 'required|string',
             'purchase_discount_percent' => 'nullable|numeric|min:0|max:100',
             'sale_discount_percent' => 'nullable|numeric|min:0|max:100',
             'alert_quantity' => 'nullable|integer|min:0',
@@ -1656,7 +1665,7 @@ class ProductController extends Controller
                 'price_per_m2' => 'required|numeric|min:0', // Allowed 0 price
                 'purchase_price_per_m2' => 'required|numeric|min:0',
             ]);
-        } elseif (in_array($mode, ['by_cartons', 'by_bandal'])) {
+        } elseif (Product::isCartonMode($mode)) {
             $rules = array_merge($rules, [
                 'pieces_per_box' => 'nullable|integer|min:1',
                 'boxes_quantity' => 'nullable|numeric|min:0',

@@ -77,6 +77,32 @@ class Product extends Model
         return $this->hasMany(ProductWebImage::class)->orderBy('sort_order', 'asc');
     }
 
+    public static function isCartonMode($sizeMode)
+    {
+        if (empty($sizeMode)) return false;
+        if (in_array($sizeMode, ['by_cartons', 'by_bandal'])) return true;
+        if (in_array($sizeMode, ['by_pieces', 'by_size', 'by_kg', 'by_gm', 'by_ton', 'by_meter', 'by_feet'])) return false;
+
+        $unit = Unit::where('slug', $sizeMode)->first();
+        if ($unit) {
+            return ($unit->type ?? 'carton') === 'carton';
+        }
+        return true; // Any custom unit defaults to carton-like functionality as requested
+    }
+
+    public static function isWeightMode($sizeMode)
+    {
+        if (empty($sizeMode)) return false;
+        if (in_array($sizeMode, ['by_kg', 'by_gm', 'by_ton'])) return true;
+        $unit = Unit::where('slug', $sizeMode)->first();
+        return $unit && ($unit->type ?? '') === 'weight';
+    }
+
+    public function isCartonType()
+    {
+        return self::isCartonMode($this->size_mode);
+    }
+
     protected static function booted()
     {
         static::saved(function ($product) {

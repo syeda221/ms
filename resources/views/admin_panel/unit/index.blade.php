@@ -20,6 +20,7 @@
                                              <tr>
                                                  <th class="text-center">Id</th>
                                                  <th class="text-center">Name</th>
+                                                 <th class="text-center">Functionality</th>
                                                  <th class="text-center">Action</th>
                                              </tr>
                                          </thead>
@@ -27,7 +28,17 @@
                                              @foreach ($unit as $company)
                                                  <tr>
                                                      <td class="id">{{ $company->id }}</td>
-                                                     <td class="name">{{ $company->name }}</td>
+                                                     <td class="name fw-bold">{{ $company->name }}</td>
+                                                     <td class="type">
+                                                         <span class="d-none type-val">{{ $company->type ?? 'carton' }}</span>
+                                                         @if(($company->type ?? 'carton') === 'carton')
+                                                             <span class="badge badge-primary bg-primary text-white" style="font-size: 11px;"><i class="fas fa-box me-1"></i>Carton / Pack (CTN)</span>
+                                                         @elseif(($company->type ?? '') === 'weight')
+                                                             <span class="badge badge-warning bg-warning text-dark" style="font-size: 11px;"><i class="fas fa-weight-hanging me-1"></i>Weight</span>
+                                                         @else
+                                                             <span class="badge badge-secondary bg-secondary text-white" style="font-size: 11px;"><i class="fas fa-cube me-1"></i>Piece (1:1)</span>
+                                                         @endif
+                                                     </td>
                                                      <td>
                                                          @include('admin_panel.partials.action_buttons', [
                                                              'editRoute' => route('store.Unit'),
@@ -69,8 +80,17 @@
                          @csrf
                          <input type="hidden" name="edit_id" id="id" />
                          <div class="mb-3">
-                             <label for="title" class="form-label">Title</label>
-                             <input type="text" name="name" class="form-control" id="name" />
+                             <label for="name" class="form-label">Title / Name</label>
+                             <input type="text" name="name" class="form-control" id="name" placeholder="e.g. Carton, Box, Pack, Bora, Peti" required />
+                         </div>
+                         <div class="mb-3">
+                             <label for="type" class="form-label">Functionality / Behavior</label>
+                             <select name="type" id="type" class="form-control form-select">
+                                 <option value="carton" selected>Carton / Pack / Box (Has pieces per unit - CTN Functionality)</option>
+                                 <option value="standard">Standard / Pieces (1:1 Single Item)</option>
+                                 <option value="weight">Weight (Kg / Gm / Ton)</option>
+                             </select>
+                             <small class="text-muted d-block mt-1">Carton / Pack gives full CTN functionality (Pieces per carton/pack, conversion factor, price calculation).</small>
                          </div>
                  </div>
                  <div class="modal-footer">
@@ -109,16 +129,23 @@
              $(this).find(':submit').attr('disabled', true);
              myAjax(url, formdata, method);
          });
+         $(document).on('click', '#reset', function() {
+             $('#id').val('');
+             $('#name').val('');
+             $('#type').val('carton');
+             $('#exampleModalLabel').text('Add Units');
+         });
+
          $(document).on('click', '.edit-btn', function() {
-
              var tr = $(this).closest("tr");
-             var id = tr.find(".id").text();
-             var name = tr.find(".name").text();
-             $('#id').val(id); // Set the ID in the hidden input field
-             $('#name').val(name)
-             $("#exampleModal").modal("show")
-
-
+             var id = tr.find(".id").text().trim();
+             var name = tr.find(".name").text().trim();
+             var type = tr.find(".type-val").text().trim() || 'carton';
+             $('#id').val(id);
+             $('#name').val(name);
+             $('#type').val(type);
+             $('#exampleModalLabel').text('Edit Unit');
+             $("#exampleModal").modal("show");
          });
      </script>
      <script>

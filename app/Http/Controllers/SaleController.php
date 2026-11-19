@@ -1275,7 +1275,7 @@ class SaleController extends Controller
                     $loose = (float) ($request->loose_pieces[$index] ?? 0); // Legacy/Fallback
 
                     // Quantity Logic based on Size Mode
-                    if (in_array($product->size_mode, ['by_cartons', 'by_bandal']) || $product->size_mode === 'by_size') {
+                    if (\App\Models\Product::isCartonMode($product->size_mode) || $product->size_mode === 'by_size') {
                         // For Carton/Size modes, Frontend sends 'total_pieces' (Calculated Pieces)
                         // and 'qty' contains "Box.Loose" string.
                         $reqTotal = (float) ($request->total_pieces[$index] ?? 0);

@@ -423,7 +423,7 @@ class PurchaseController extends Controller
                 if ($ppb <= 0) $ppb = 1;
 
                 $isPiece = in_array($unit, ['pcs', 'pc', 'piece']);
-                $isCarton = in_array($unit, ['carton', 'ctn', 'box', 'bandal', 'bundal', 'bndl']) || (!$isPiece && in_array($item->size_mode, ['by_cartons', 'by_bandal']));
+                $isCarton = in_array($unit, ['carton', 'ctn', 'box', 'bandal', 'bundal', 'bndl']) || (!$isPiece && \App\Models\Product::isCartonMode($item->size_mode));
 
                 if ($unit === 'gm' || $unit === 'g' || $unit === 'gram' || $unit === 'grams') {
                     $baseQty = ((float) $item->qty) / 1000.0;
@@ -739,7 +739,7 @@ class PurchaseController extends Controller
                 $curPPM2 = (float) ($ppm2[$i] ?? 0); // This is actually m2_per_piece if by_size
                 $rawQtyStr = (string) ($qtys[$i] ?? '0');
                 $isPiece = in_array($u, ['pcs', 'pc', 'piece']);
-                $isCarton = in_array($u, ['carton', 'ctn', 'box', 'bandal', 'bundal', 'bndl']) || (!$isPiece && in_array($curSizeMode, ['by_cartons', 'by_bandal']));
+                $isCarton = in_array($u, ['carton', 'ctn', 'box', 'bandal', 'bundal', 'bndl']) || (!$isPiece && \App\Models\Product::isCartonMode($curSizeMode));
 
                 if ($curSizeMode === 'by_size') {
                     // Frontend: pieces_per_m2 * totalPieces * price
@@ -1399,7 +1399,7 @@ class PurchaseController extends Controller
                 $curPPM2 = (float) ($ppm2[$i] ?? 0);
                 $rawQtyStr = (string) ($qtys[$i] ?? '0');
                 $isPiece = in_array($u, ['pcs', 'pc', 'piece']);
-                $isCarton = in_array($u, ['carton', 'ctn', 'box', 'bandal', 'bundal', 'bndl']) || (!$isPiece && in_array($curSizeMode, ['by_cartons', 'by_bandal']));
+                $isCarton = in_array($u, ['carton', 'ctn', 'box', 'bandal', 'bundal', 'bndl']) || (!$isPiece && \App\Models\Product::isCartonMode($curSizeMode));
 
                 if ($curSizeMode === 'by_size') {
                     $grossTotal = $curPPM2 * $qty * $price;

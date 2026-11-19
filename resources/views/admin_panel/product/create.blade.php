@@ -595,17 +595,24 @@
                                             </div>
                                         </div>
                                         <div class="col-md-3">
-                                            <label class="form-label-pro">Unit</label>
+                                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                                <label class="form-label-pro mb-0">Unit</label>
+                                                <a href="{{ route('Unit.home') }}" target="_blank" class="text-primary text-decoration-none" style="font-size: 11px;">
+                                                    <i class="fas fa-plus-circle me-1"></i>Manage Units
+                                                </a>
+                                            </div>
                                             <select class="form-select form-control-pro form-select-pro fw-bold" name="size_mode" id="unit-dropdown">
-                                                <option value="by_pieces">Pcs</option>
-                                                <option value="by_cartons">Carton</option>
-<option value="by_bandal">Bundal</option>
-                                                <option value="by_meter">Meter</option>
-                                                <option value="by_feet">Ft (Feet)</option>
-                                                <option value="by_kg">Kg</option>
-                                                <option value="by_gm">Gm</option>
-                                                <option value="by_ton">Ton</option>
+                                                @foreach($units as $u)
+                                                    <option value="{{ $u->slug }}" 
+                                                            data-unit-id="{{ $u->id }}" 
+                                                            data-type="{{ $u->type ?? 'carton' }}" 
+                                                            data-name="{{ $u->name }}"
+                                                            {{ $u->slug === 'by_pieces' ? 'selected' : '' }}>
+                                                        {{ $u->name }}
+                                                    </option>
+                                                @endforeach
                                             </select>
+                                            <input type="hidden" name="unit" id="unit_id_input" value="{{ $units->where('slug', 'by_pieces')->first()->id ?? ($units->first()->id ?? '') }}">
                                         </div>
                                     </div>
                                 </div>
@@ -801,6 +808,31 @@
             const form = document.getElementById('productForm');
             const unitDropdown = document.getElementById('unit-dropdown');
 
+            const weightUnits = ['by_kg', 'by_gm', 'by_ton'];
+            function isWeightUnit(unit) {
+                return weightUnits.includes(unit);
+            }
+            function getSelectedUnitOption() {
+                if (!unitDropdown || unitDropdown.selectedIndex < 0) return null;
+                return unitDropdown.options[unitDropdown.selectedIndex];
+            }
+            function getSelectedUnitType() {
+                const opt = getSelectedUnitOption();
+                return opt ? (opt.getAttribute('data-type') || '') : '';
+            }
+            function getSelectedUnitName() {
+                const opt = getSelectedUnitOption();
+                return opt ? (opt.getAttribute('data-name') || opt.text.trim()) : 'Carton';
+            }
+            function isCartonUnit(mode) {
+                if (!mode && unitDropdown) mode = unitDropdown.value;
+                const type = getSelectedUnitType();
+                if (type === 'carton') return true;
+                if (['by_cartons', 'by_bandal'].includes(mode)) return true;
+                if (isWeightUnit(mode) || mode === 'by_pieces' || type === 'standard' || type === 'weight') return false;
+                return true;
+            }
+
             // Image Handler
             const imgInput = document.getElementById('imageInput');
             const preview = document.getElementById('preview');
@@ -852,7 +884,7 @@
                 let firstConv = vConvFactors.length > 0 ? (parseFloat(vConvFactors[0].value) || 0) : 0;
 
                 const mode = unitDropdown ? unitDropdown.value : 'by_pieces';
-                if(['by_cartons', 'by_bandal'].includes(mode)) {
+                if(isCartonUnit(mode)) {
                     let ppb = firstConv > 0 ? firstConv : 1;
                     document.getElementById('boxes_quantity').value = totalStock;
                     document.getElementById('pieces_per_box').value = ppb;
@@ -1027,8 +1059,8 @@
             function addBaseVariantRow() {
                 const tr = document.createElement('tr');
                 const productName = productNameInput.value || '';
-                const baseUnitName = unitDropdown ? unitDropdown.options[unitDropdown.selectedIndex].text : 'Kg';
-                const isCartonMode = unitDropdown && unitDropdown.value === 'by_cartons';
+                const baseUnitName = getSelectedUnitName();
+                const isCartonMode = isCartonUnit(unitDropdown ? unitDropdown.value : '');
                 const vid = 'base_' + Date.now();
                 tr.innerHTML = `
                     <td class="p-1">
@@ -1039,21 +1071,22 @@
                     <td class="p-1"><input type="text" class="form-control-pro form-control-sm" name="variant_color[]" placeholder="Color"></td>
                     <td class="p-1">
                         <select class="form-select form-select-sm fw-bold text-primary px-1" name="variant_unit[]" style="font-size:11px;">
-                            <option value="Carton" ${isCartonMode||baseUnitName.includes('Carton')?'selected':''}>Carton</option>
-                            <option value="Pcs" ${(!isCartonMode && (baseUnitName.includes('Pcs')||baseUnitName.includes('Pieces')))?'selected':''}>Pcs</option>
-                            <option value="Kg" ${baseUnitName.includes('Kg')?'selected':''}>Kg</option>
-                            <option value="Gm" ${baseUnitName.includes('Gm')?'selected':''}>Gm</option>
-                            <option value="Ft" ${baseUnitName.includes('Ft')?'selected':''}>Ft</option>
-                            <option value="Meter" ${baseUnitName.includes('Meter')?'selected':''}>Mtr</option>
+                            <option value="${baseUnitName}" selected>${baseUnitName}</option>
+                            ${baseUnitName !== 'Pcs' ? '<option value="Pcs">Pcs</option>' : ''}
+                            <option value="Carton">Carton</option>
                             <option value="Box">Box</option>
+                            <option value="Kg">Kg</option>
+                            <option value="Gm">Gm</option>
+                            <option value="Ft">Ft</option>
+                            <option value="Meter">Mtr</option>
                             <option value="Dozen">Dzn</option>
                         </select>
                     </td>
                     <td class="p-1">
-                        <input type="number" class="form-control-pro form-control-sm text-center fw-bold text-primary" name="variant_stock[]" step="any" value="0" placeholder="0" title="${isCartonMode ? 'Initial Stock (Cartons)' : 'Initial Stock'}">
+                        <input type="number" class="form-control-pro form-control-sm text-center fw-bold text-primary" name="variant_stock[]" step="any" value="0" placeholder="0" title="${isCartonMode ? 'Initial Stock (' + baseUnitName + ')' : 'Initial Stock'}">
                     </td>
                     <td class="p-0 conv-col">
-                        <input type="number" class="form-control-pro form-control-sm conv-factor-input text-center fw-bold ${isCartonMode ? 'text-primary' : ''}" name="variant_conv_factor[]" step="any" value="${isCartonMode ? '' : '1'}" ${isCartonMode ? '' : 'readonly'} placeholder="${isCartonMode ? 'e.g. 6' : '1'}" title="${isCartonMode ? 'Pieces per Carton' : 'Base Conv Factor = 1'}" style="border-radius:0; border:1px solid #dee2e6; height:30px; ${isCartonMode ? 'background:#fff;' : 'background:#f8f8f8;'}">
+                        <input type="number" class="form-control-pro form-control-sm conv-factor-input text-center fw-bold ${isCartonMode ? 'text-primary' : ''}" name="variant_conv_factor[]" step="any" value="${isCartonMode ? '' : '1'}" ${isCartonMode ? '' : 'readonly'} placeholder="${isCartonMode ? 'e.g. 6' : '1'}" title="${isCartonMode ? 'Pieces per ' + baseUnitName : 'Base Conv Factor = 1'}" style="border-radius:0; border:1px solid #dee2e6; height:30px; ${isCartonMode ? 'background:#fff;' : 'background:#f8f8f8;'}">
                     </td>
                     <td class="p-0 piece-wt-only-col">
                         <div style="position:relative;">
@@ -1173,7 +1206,8 @@
                 const vid = 'var_' + Date.now();
                 tr.dataset.vid = vid;
                 
-                const isCartonMode = unitDropdown && unitDropdown.value === 'by_cartons';
+                const isCartonMode = isCartonUnit(unitDropdown ? unitDropdown.value : '');
+                const curUnitName = getSelectedUnitName();
                 let factor = 1;
                 let suggestedName = productNameInput.value || '';
                 if (weightGrams) {
@@ -1213,21 +1247,22 @@
                     <td class="p-1"><input type="text" class="form-control-pro form-control-sm" name="variant_color[]" placeholder="Color"></td>
                     <td class="p-1">
                         <select class="form-select form-select-sm px-1 fw-bold text-dark" name="variant_unit[]" style="font-size:11px;">
-                            <option value="Carton" ${isCartonMode ? 'selected' : ''}>Carton</option>
-                            <option value="Pcs" ${!isCartonMode ? 'selected' : ''}>Pcs</option>
+                            <option value="${curUnitName}" ${isCartonMode ? 'selected' : ''}>${curUnitName}</option>
+                            ${curUnitName !== 'Pcs' ? '<option value="Pcs" ' + (!isCartonMode ? 'selected' : '') + '>Pcs</option>' : ''}
+                            <option value="Carton">Carton</option>
+                            <option value="Box">Box</option>
                             <option value="Kg">Kg</option>
                             <option value="Gm">Gm</option>
                             <option value="Ft">Ft</option>
                             <option value="Meter">Mtr</option>
-                            <option value="Box">Box</option>
                             <option value="Dozen">Dzn</option>
                         </select>
                     </td>
                     <td class="p-1">
-                        <input type="number" class="form-control-pro form-control-sm text-center fw-bold text-primary stock-input" name="variant_stock[]" step="any" value="0" placeholder="0" title="${isCartonMode ? 'Initial Stock (Cartons)' : 'Initial Stock'}" ${variantMode === 'weight' ? 'readonly style="background:#f8f9ff;color:#0d6efd;font-weight:bold;"' : ''}>
+                        <input type="number" class="form-control-pro form-control-sm text-center fw-bold text-primary stock-input" name="variant_stock[]" step="any" value="0" placeholder="0" title="${isCartonMode ? 'Initial Stock (' + curUnitName + ')' : 'Initial Stock'}" ${variantMode === 'weight' ? 'readonly style="background:#f8f9ff;color:#0d6efd;font-weight:bold;"' : ''}>
                     </td>
                     <td class="p-0 conv-col">
-                        <input type="text" inputmode="decimal" class="form-control-pro form-control-sm conv-factor-input text-center fw-bold text-success" name="variant_conv_factor[]" value="${isCartonMode ? '0' : ''}" placeholder="0" title="${isCartonMode ? 'Pieces per Carton' : 'Conv Factor: weight per Pcs in base unit'}" style="border-radius:0; border:1px solid #198754; height:30px; border-width:1.5px;">
+                        <input type="text" inputmode="decimal" class="form-control-pro form-control-sm conv-factor-input text-center fw-bold text-success" name="variant_conv_factor[]" value="${isCartonMode ? '0' : ''}" placeholder="0" title="${isCartonMode ? 'Pieces per ' + curUnitName : 'Conv Factor: weight per Pcs in base unit'}" style="border-radius:0; border:1px solid #198754; height:30px; border-width:1.5px;">
                     </td>
                     <td class="p-0 piece-wt-only-col">
                         <div style="position:relative;">
@@ -1294,7 +1329,7 @@
                 if (!row) return;
                 const mode = unitDropdown ? unitDropdown.value : 'by_pieces';
                 const rowUnit = row.querySelector('[name="variant_unit[]"]')?.value || '';
-                const isCarton = (['by_cartons', 'by_bandal'].includes(mode) || rowUnit.toLowerCase() === 'carton');
+                const isCarton = isCartonUnit(mode) || rowUnit.toLowerCase() === 'carton' || rowUnit.toLowerCase() === getSelectedUnitName().toLowerCase();
 
                 const convInp = row.querySelector('.conv-factor-input');
                 let ppb = parseFloat(convInp?.value || 0);
@@ -1339,13 +1374,14 @@
             function toggleFactorColumns() {
                 if (!unitDropdown) return;
                 const mode = unitDropdown.value;
-                const isWeight = (mode === 'by_kg' || mode === 'by_gm' || mode === 'by_ton');
-                const isCarton = (['by_cartons', 'by_bandal'].includes(mode));
+                const isWeight = isWeightUnit(mode);
+                const isCarton = isCartonUnit(mode);
+                const curUnitName = getSelectedUnitName();
 
                 const headerEl = document.getElementById('convFactorHeader');
                 if (headerEl) {
                     if (isCarton) {
-                        headerEl.textContent = 'Pcs / Carton';
+                        headerEl.textContent = 'Pcs / ' + (curUnitName || 'Carton');
                     } else if (isWeight) {
                         headerEl.textContent = 'Conv Factor';
                     } else {
@@ -1370,11 +1406,11 @@
                                 baseConv.value = '';
                             }
                             baseConv.placeholder = 'e.g. 6';
-                            baseConv.title = 'Pieces per Carton';
+                            baseConv.title = 'Pieces per ' + (curUnitName || 'Carton');
                         }
                         const baseUnit = baseRow.querySelector('select[name="variant_unit[]"]');
                         if (baseUnit) {
-                            baseUnit.value = 'Carton';
+                            baseUnit.value = curUnitName;
                         }
                     }
                 } else if (isWeight) {
@@ -1413,10 +1449,18 @@
 
             if (unitDropdown) {
                 $(unitDropdown).on('change', function() {
+                    const selOpt = getSelectedUnitOption();
+                    if (selOpt && document.getElementById('unit_id_input')) {
+                        document.getElementById('unit_id_input').value = selOpt.getAttribute('data-unit-id') || '';
+                    }
                     updateVariantMode();
                     toggleFactorColumns();
                 });
                 // Initialize mode on load
+                const selOpt = getSelectedUnitOption();
+                if (selOpt && document.getElementById('unit_id_input')) {
+                    document.getElementById('unit_id_input').value = selOpt.getAttribute('data-unit-id') || '';
+                }
                 updateVariantMode();
                 toggleFactorColumns();
             }
@@ -1587,9 +1631,9 @@
                         <input type="number" class="mob-input mob-sync ${!isBase && isWeightMode ? 'auto-field mob-stock-auto' : ''}" data-field="variant_stock[]" value="${stockVal}" placeholder="${!isBase && isWeightMode ? 'Auto' : '0'}" ${!isBase && isWeightMode ? 'readonly' : ''} step="any">
                     </div>
 
-                    ${unitDropdown && unitDropdown.value === 'by_cartons' ? `
+                    ${isCartonUnit(unitDropdown ? unitDropdown.value : '') ? `
                     <div class="mob-field-group">
-                        <div class="mob-label" style="color:#0284c7;font-weight:700;">📦 Pieces Per Carton</div>
+                        <div class="mob-label" style="color:#0284c7;font-weight:700;">📦 Pieces Per ${getSelectedUnitName()}</div>
                         <input type="number" class="mob-input conv-field mob-sync mob-conv-inp" data-field="variant_conv_factor[]" value="${convVal || '0'}" placeholder="0" autocomplete="off" style="border:1.5px solid #0284c7;">
                     </div>
                     ` : ''}
@@ -1626,20 +1670,20 @@
 
                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
                         <div class="mob-field-group">
-                            <div class="mob-label"><span class="mob-lbl-sale">${unitDropdown && unitDropdown.value === 'by_cartons' ? 'Sale Price (1 Pc)' : 'Sale Price'}</span> <span class="req">*</span></div>
+                            <div class="mob-label"><span class="mob-lbl-sale">${isCartonUnit(unitDropdown ? unitDropdown.value : '') ? 'Sale Price (1 Pc)' : 'Sale Price'}</span> <span class="req">*</span></div>
                             <input type="number" class="mob-input mob-sync" data-field="variant_sale_price[]" value="${saleVal}" placeholder="0.00" step="any" required>
-                            <div class="mob-ctn-hint text-primary fw-bold ${unitDropdown && unitDropdown.value === 'by_cartons' ? '' : 'd-none'}" style="font-size:10px;margin-top:2px;">Ctn: <span class="mob-ctn-sale-val">${((parseFloat(saleVal)||0)*(parseFloat(convVal)||0)).toFixed(2)}</span></div>
+                            <div class="mob-ctn-hint text-primary fw-bold ${isCartonUnit(unitDropdown ? unitDropdown.value : '') ? '' : 'd-none'}" style="font-size:10px;margin-top:2px;">Ctn: <span class="mob-ctn-sale-val">${((parseFloat(saleVal)||0)*(parseFloat(convVal)||0)).toFixed(2)}</span></div>
                         </div>
                         <div class="mob-field-group">
-                            <div class="mob-label"><span class="mob-lbl-wsale">${unitDropdown && unitDropdown.value === 'by_cartons' ? 'Wholesale (1 Pc)' : 'Wholesale Price'}</span></div>
+                            <div class="mob-label"><span class="mob-lbl-wsale">${isCartonUnit(unitDropdown ? unitDropdown.value : '') ? 'Wholesale (1 Pc)' : 'Wholesale Price'}</span></div>
                             <input type="number" class="mob-input mob-sync" data-field="variant_wholesale_price[]" value="${wsaleVal}" placeholder="0.00" step="any">
-                            <div class="mob-ctn-hint text-secondary fw-bold ${unitDropdown && unitDropdown.value === 'by_cartons' ? '' : 'd-none'}" style="font-size:10px;margin-top:2px;">Ctn: <span class="mob-ctn-wsale-val">${((parseFloat(wsaleVal)||0)*(parseFloat(convVal)||0)).toFixed(2)}</span></div>
+                            <div class="mob-ctn-hint text-secondary fw-bold ${isCartonUnit(unitDropdown ? unitDropdown.value : '') ? '' : 'd-none'}" style="font-size:10px;margin-top:2px;">Ctn: <span class="mob-ctn-wsale-val">${((parseFloat(wsaleVal)||0)*(parseFloat(convVal)||0)).toFixed(2)}</span></div>
                         </div>
                     </div>
                     <div class="mob-field-group">
-                        <div class="mob-label"><span class="mob-lbl-purch">${unitDropdown && unitDropdown.value === 'by_cartons' ? 'Purchase Price (1 Pc)' : 'Purchase Price'}</span> <span class="req">*</span></div>
+                        <div class="mob-label"><span class="mob-lbl-purch">${isCartonUnit(unitDropdown ? unitDropdown.value : '') ? 'Purchase Price (1 Pc)' : 'Purchase Price'}</span> <span class="req">*</span></div>
                         <input type="number" class="mob-input mob-sync" data-field="variant_purchase_price[]" value="${purchVal}" placeholder="0.00" step="any" required>
-                        <div class="mob-ctn-hint text-success fw-bold ${unitDropdown && unitDropdown.value === 'by_cartons' ? '' : 'd-none'}" style="font-size:10px;margin-top:2px;">Ctn: <span class="mob-ctn-purch-val">${((parseFloat(purchVal)||0)*(parseFloat(convVal)||0)).toFixed(2)}</span></div>
+                        <div class="mob-ctn-hint text-success fw-bold ${isCartonUnit(unitDropdown ? unitDropdown.value : '') ? '' : 'd-none'}" style="font-size:10px;margin-top:2px;">Ctn: <span class="mob-ctn-purch-val">${((parseFloat(purchVal)||0)*(parseFloat(convVal)||0)).toFixed(2)}</span></div>
                     </div>
                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
                         <div class="mob-field-group">
