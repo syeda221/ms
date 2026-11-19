@@ -759,8 +759,9 @@
                             $totalPieces = (int) ($item['total_pieces'] ?? ($ppb > 1 ? round(($item['qty_box'] ?? $item['qty'] ?? 0) * $ppb) : ($item['qty'] ?? 0)));
                             $sizeMode = $item['size_mode'] ?? 'std';
 
-                            $cLabel = ($sizeMode === 'by_bandal') ? 'Bndl' : 'Ctn';
-                            if (in_array($sizeMode, ['by_cartons', 'by_bandal']) || ($ppb > 1 && $sizeMode !== 'by_pieces')) {
+                            $cLabel = !empty($item['unit']) ? $item['unit'] : (!empty($item['variant_unit']) && !in_array(strtolower($item['variant_unit']), ['pcs','piece','pieces']) ? $item['variant_unit'] : (($sizeMode === 'by_bandal') ? 'Bndl' : 'Ctn'));
+                            $isCartonType = \App\Models\Product::isCartonMode($sizeMode) || ($ppb > 1 && $sizeMode !== 'by_pieces');
+                            if ($isCartonType) {
                                 $boxes = floor($totalPieces / $ppb);
                                 $loose = $totalPieces % $ppb;
                                 if ($boxes > 0 && $loose > 0) {
@@ -1844,7 +1845,7 @@
                                 $piecesPerBox;
 
 
-                            $cLabel = ($sizeMode === 'by_bandal') ? 'Bndl' : 'Ctn';
+                            $cLabel = !empty($item['unit']) ? $item['unit'] : (!empty($item['variant_unit']) && !in_array(strtolower($item['variant_unit']), ['pcs','piece','pieces']) ? $item['variant_unit'] : (($sizeMode === 'by_bandal') ? 'Bndl' : 'Ctn'));
                             if (
                                 $boxes > 0
                                 &&

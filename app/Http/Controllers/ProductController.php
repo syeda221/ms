@@ -51,6 +51,8 @@ class ProductController extends Controller
             'wholesale_price'       => (float)($product->wholesale_price ?? 0),
             'weight_per_piece'      => (float)($product->weight_per_piece ?? 0),
             'size_mode'             => $product->size_mode,
+            'unit_name'             => $product->unit_name,
+            'is_carton'             => $product->is_carton,
             'pieces_per_box'        => $product->pieces_per_box,
             'price_per_m2'          => $product->price_per_m2,
             'sale_price_per_box'    => $product->sale_price_per_box,
@@ -508,7 +510,7 @@ class ProductController extends Controller
         $boxes = 0;
         $loose = 0;
 
-        if (in_array($product->size_mode, ['by_cartons', 'by_bandal']) || $product->size_mode === 'by_size') {
+        if (Product::isCartonMode($product->size_mode) || $product->size_mode === 'by_size') {
             $boxes = floor($totalPieces / $ppb);
             $loose = $totalPieces % $ppb;
         } else {
@@ -1515,7 +1517,7 @@ class ProductController extends Controller
         $hasInit = \App\Models\StockMovement::where('product_id', $product->id)->where('ref_type', 'INIT')->exists();
         $displayPieces = $hasInit ? $initQty : $totalPieces;
 
-        if (in_array($product->size_mode, ['by_cartons', 'by_bandal']) || $product->size_mode === 'by_size') {
+        if (Product::isCartonMode($product->size_mode) || $product->size_mode === 'by_size') {
             $product->boxes_quantity = (int) floor($displayPieces / $ppb);
             $product->loose_pieces   = (int) ($displayPieces % $ppb);
         } elseif ($product->size_mode === 'by_pieces') {
@@ -1558,14 +1560,14 @@ class ProductController extends Controller
                                 'name' => $product->item_name . ($cName ? ' - ' . $cName : ''),
                                 'size' => '',
                                 'color' => $cName,
-                                'unit' => optional($product->unit)->name ?? (in_array($product->size_mode, ['by_cartons', 'by_bandal']) ? 'Carton' : 'Pcs'),
-                                'stock' => $idx === 0 ? ((in_array($product->size_mode, ['by_cartons', 'by_bandal'])) ? (($product->boxes_quantity ?: 0) . ($product->loose_pieces ? '.' . $product->loose_pieces : '')) : ($totalPieces ?: 0)) : 0,
+                                'unit' => optional($product->unit)->name ?? (Product::isCartonMode($product->size_mode) ? 'Carton' : 'Pcs'),
+                                'stock' => $idx === 0 ? ((Product::isCartonMode($product->size_mode)) ? (($product->boxes_quantity ?: 0) . ($product->loose_pieces ? '.' . $product->loose_pieces : '')) : ($totalPieces ?: 0)) : 0,
                                 'sale_price' => $product->sale_price_per_piece ?? $product->sale_price_per_box ?? 0,
                                 'wholesale_price' => $product->wholesale_price ?? 0,
                                 'purch_price' => $product->purchase_price_per_piece ?? 0,
                                 'alert' => $product->alert_quantity ?? (($product->alert_carton_quantity ?? 0) * ($product->pieces_per_box > 0 ? $product->pieces_per_box : 1)),
                                 'barcode' => '',
-                                'conv_factor' => (in_array($product->size_mode, ['by_cartons', 'by_bandal'])) ? ($product->pieces_per_box ?: 1) : 1,
+                                'conv_factor' => (Product::isCartonMode($product->size_mode)) ? ($product->pieces_per_box ?: 1) : 1,
                                 'is_base_variant' => $idx === 0 ? 1 : 0
                             ];
                         }
@@ -1578,14 +1580,14 @@ class ProductController extends Controller
                     'name' => $product->item_name . ' - ' . $raw,
                     'size' => '',
                     'color' => $raw,
-                    'unit' => optional($product->unit)->name ?? (in_array($product->size_mode, ['by_cartons', 'by_bandal']) ? 'Carton' : 'Pcs'),
-                    'stock' => (in_array($product->size_mode, ['by_cartons', 'by_bandal'])) ? (($product->boxes_quantity ?: 0) . ($product->loose_pieces ? '.' . $product->loose_pieces : '')) : ($totalPieces ?: 0),
+                    'unit' => optional($product->unit)->name ?? (Product::isCartonMode($product->size_mode) ? 'Carton' : 'Pcs'),
+                    'stock' => (Product::isCartonMode($product->size_mode)) ? (($product->boxes_quantity ?: 0) . ($product->loose_pieces ? '.' . $product->loose_pieces : '')) : ($totalPieces ?: 0),
                     'sale_price' => $product->sale_price_per_piece ?: $product->sale_price_per_box ?: 0,
                     'wholesale_price' => $product->wholesale_price ?? 0,
                     'purch_price' => $product->purchase_price_per_piece ?? 0,
                     'alert' => $product->alert_quantity ?? (($product->alert_carton_quantity ?? 0) * ($product->pieces_per_box > 0 ? $product->pieces_per_box : 1)),
                     'barcode' => $product->barcode_path ?? '',
-                    'conv_factor' => (in_array($product->size_mode, ['by_cartons', 'by_bandal'])) ? ($product->pieces_per_box ?: 1) : 1,
+                    'conv_factor' => (Product::isCartonMode($product->size_mode)) ? ($product->pieces_per_box ?: 1) : 1,
                     'is_base_variant' => 1
                 ];
             }
@@ -1597,14 +1599,14 @@ class ProductController extends Controller
                     'name' => $product->item_name,
                     'size' => '-',
                     'color' => '-',
-                    'unit' => optional($product->unit)->name ?? (in_array($product->size_mode, ['by_cartons', 'by_bandal']) ? 'Carton' : 'Pcs'),
-                    'stock' => (in_array($product->size_mode, ['by_cartons', 'by_bandal'])) ? (($product->boxes_quantity ?: 0) . ($product->loose_pieces ? '.' . $product->loose_pieces : '')) : ($totalPieces ?: 0),
+                    'unit' => optional($product->unit)->name ?? (Product::isCartonMode($product->size_mode) ? 'Carton' : 'Pcs'),
+                    'stock' => (Product::isCartonMode($product->size_mode)) ? (($product->boxes_quantity ?: 0) . ($product->loose_pieces ? '.' . $product->loose_pieces : '')) : ($totalPieces ?: 0),
                     'sale_price' => $product->sale_price_per_piece ?: $product->sale_price_per_box ?: 0,
                     'wholesale_price' => $product->wholesale_price ?: 0,
                     'purch_price' => $product->purchase_price_per_piece ?: 0,
                     'alert' => $product->alert_quantity ?: (($product->alert_carton_quantity ?? 0) * ($product->pieces_per_box > 0 ? $product->pieces_per_box : 1)),
                     'barcode' => $product->barcode_path ?: '',
-                    'conv_factor' => (in_array($product->size_mode, ['by_cartons', 'by_bandal'])) ? ($product->pieces_per_box ?: 1) : 1,
+                    'conv_factor' => (Product::isCartonMode($product->size_mode)) ? ($product->pieces_per_box ?: 1) : 1,
                     'is_base_variant' => 1,
                 ]
             ];

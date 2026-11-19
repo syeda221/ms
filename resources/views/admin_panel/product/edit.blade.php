@@ -704,13 +704,9 @@
                         <select class="form-select form-select-sm fw-bold text-primary px-1" name="variant_unit[]" style="font-size:11px;">
                             <option value="${baseUnitName}" ${uNorm===baseUnitName.toLowerCase()||(isCartonMode && !v)?'selected':''}>${baseUnitName}</option>
                             ${baseUnitName !== 'Pcs' ? '<option value="Pcs" ' + ((!isCartonMode && (uNorm===\'pcs\'||uNorm===\'piece\'||uNorm===\'pieces\'||uNorm===\'pc\'))?\'selected\':\'\') + '>Pcs</option>' : ''}
-                            <option value="Carton">Carton</option>
-                            <option value="Box">Box</option>
-                            <option value="Kg">Kg</option>
-                            <option value="Gm">Gm</option>
-                            <option value="Ft">Ft</option>
-                            <option value="Meter">Mtr</option>
-                            <option value="Dozen">Dzn</option>
+                            @foreach($units as $u)
+                            ${baseUnitName !== '{{ $u->name }}' && '{{ $u->name }}' !== 'Pcs' ? '<option value="{{ $u->name }}" ' + (uNorm === '{{ strtolower($u->name) }}' ? 'selected' : '') + '>{{ $u->name }}</option>' : ''}
+                            @endforeach
                         </select>
                     </td>
                     <td class="p-1">
@@ -727,15 +723,15 @@
                     </td>
                     <td class="p-1">
                         <input type="number" class="form-control-pro form-control-sm base-sale-input sale-price-input" name="variant_sale_price[]" step="any" value="${escapeHtml(saleVal)}" placeholder="0.00" required>
-                        <div class="carton-price-badge carton-sale-badge text-primary fw-bold d-none" style="font-size: 10px; line-height: 1.2; margin-top: 2px;">Ctn: <span class="ctn-sale-val">0.00</span></div>
+                        <div class="carton-price-badge carton-sale-badge text-primary fw-bold d-none" style="font-size: 10px; line-height: 1.2; margin-top: 2px;"><span class="ctn-badge-name">${getSelectedUnitName()}</span>: <span class="ctn-sale-val">0.00</span></div>
                     </td>
                     <td class="p-1">
                         <input type="number" class="form-control-pro form-control-sm wholesale-price-input" name="variant_wholesale_price[]" step="any" value="${escapeHtml(wholesaleVal)}" placeholder="0.00">
-                        <div class="carton-price-badge carton-wsale-badge text-secondary fw-bold d-none" style="font-size: 10px; line-height: 1.2; margin-top: 2px;">Ctn: <span class="ctn-wsale-val">0.00</span></div>
+                        <div class="carton-price-badge carton-wsale-badge text-secondary fw-bold d-none" style="font-size: 10px; line-height: 1.2; margin-top: 2px;"><span class="ctn-badge-name">${getSelectedUnitName()}</span>: <span class="ctn-wsale-val">0.00</span></div>
                     </td>
                     <td class="p-1">
                         <input type="number" class="form-control-pro form-control-sm base-purch-input purch-price-input" name="variant_purchase_price[]" step="any" value="${escapeHtml(purchVal)}" placeholder="0.00" required>
-                        <div class="carton-price-badge carton-purch-badge text-success fw-bold d-none" style="font-size: 10px; line-height: 1.2; margin-top: 2px;">Ctn: <span class="ctn-purch-val">0.00</span></div>
+                        <div class="carton-price-badge carton-purch-badge text-success fw-bold d-none" style="font-size: 10px; line-height: 1.2; margin-top: 2px;"><span class="ctn-badge-name">${getSelectedUnitName()}</span>: <span class="ctn-purch-val">0.00</span></div>
                     </td>
                     <td class="p-1"><input type="number" class="form-control-pro form-control-sm" name="variant_sale_discount[]" step="0.01" value="${escapeHtml(saleDiscVal)}" placeholder="0" title="Sale Discount %"></td>
                     <td class="p-1"><input type="number" class="form-control-pro form-control-sm" name="variant_purchase_discount[]" step="0.01" value="${escapeHtml(purchDiscVal)}" placeholder="0" title="Purchase Discount %"></td>
@@ -898,13 +894,9 @@
                         <select class="form-select form-select-sm px-1 fw-bold text-dark" name="variant_unit[]" style="font-size:11px;">
                             <option value="${curUnitName}" ${uNorm===curUnitName.toLowerCase()||(isCartonMode && !v)?'selected':''}>${curUnitName}</option>
                             ${curUnitName !== 'Pcs' ? '<option value="Pcs" ' + ((!isCartonMode && (uNorm===\'pcs\'||uNorm===\'piece\'||uNorm===\'pieces\'||uNorm===\'pc\'))?\'selected\':\'\') + '>Pcs</option>' : ''}
-                            <option value="Carton">Carton</option>
-                            <option value="Box">Box</option>
-                            <option value="Kg">Kg</option>
-                            <option value="Gm">Gm</option>
-                            <option value="Ft">Ft</option>
-                            <option value="Meter">Mtr</option>
-                            <option value="Dozen">Dzn</option>
+                            @foreach($units as $u)
+                            ${curUnitName !== '{{ $u->name }}' && '{{ $u->name }}' !== 'Pcs' ? '<option value="{{ $u->name }}" ' + (uNorm === '{{ strtolower($u->name) }}' ? 'selected' : '') + '>{{ $u->name }}</option>' : ''}
+                            @endforeach
                         </select>
                     </td>
                     <td class="p-1">
@@ -921,15 +913,15 @@
                     </td>
                     <td class="p-1">
                         <input type="number" class="form-control-pro form-control-sm sale-price-input" name="variant_sale_price[]" step="any" value="${escapeHtml(suggSale)}" placeholder="0.00" required>
-                        <div class="carton-price-badge carton-sale-badge text-primary fw-bold d-none" style="font-size: 10px; line-height: 1.2; margin-top: 2px;">Ctn: <span class="ctn-sale-val">0.00</span></div>
+                        <div class="carton-price-badge carton-sale-badge text-primary fw-bold d-none" style="font-size: 10px; line-height: 1.2; margin-top: 2px;"><span class="ctn-badge-name">${getSelectedUnitName()}</span>: <span class="ctn-sale-val">0.00</span></div>
                     </td>
                     <td class="p-1">
                         <input type="number" class="form-control-pro form-control-sm" name="variant_wholesale_price[]" step="any" value="${escapeHtml(suggWholesale)}" placeholder="0.00">
-                        <div class="carton-price-badge carton-wsale-badge text-secondary fw-bold d-none" style="font-size: 10px; line-height: 1.2; margin-top: 2px;">Ctn: <span class="ctn-wsale-val">0.00</span></div>
+                        <div class="carton-price-badge carton-wsale-badge text-secondary fw-bold d-none" style="font-size: 10px; line-height: 1.2; margin-top: 2px;"><span class="ctn-badge-name">${getSelectedUnitName()}</span>: <span class="ctn-wsale-val">0.00</span></div>
                     </td>
                     <td class="p-1">
                         <input type="number" class="form-control-pro form-control-sm purch-price-input" name="variant_purchase_price[]" step="any" value="${escapeHtml(suggPurch)}" placeholder="0.00" required>
-                        <div class="carton-price-badge carton-purch-badge text-success fw-bold d-none" style="font-size: 10px; line-height: 1.2; margin-top: 2px;">Ctn: <span class="ctn-purch-val">0.00</span></div>
+                        <div class="carton-price-badge carton-purch-badge text-success fw-bold d-none" style="font-size: 10px; line-height: 1.2; margin-top: 2px;"><span class="ctn-badge-name">${getSelectedUnitName()}</span>: <span class="ctn-purch-val">0.00</span></div>
                     </td>
                     <td class="p-1"><input type="number" class="form-control-pro form-control-sm" name="variant_sale_discount[]" step="0.01" value="${escapeHtml(saleDiscVal)}" placeholder="0" title="Sale Discount %"></td>
                     <td class="p-1"><input type="number" class="form-control-pro form-control-sm" name="variant_purchase_discount[]" step="0.01" value="${escapeHtml(purchDiscVal)}" placeholder="0" title="Purchase Discount %"></td>
@@ -993,18 +985,25 @@
                 const wsBadge = row.querySelector('.carton-wsale-badge');
 
                 if (isCarton && ppb > 0) {
+                    const uName = getSelectedUnitName();
                     if (saleBadge && saleInp) {
                         const s = parseFloat(saleInp.value) || 0;
+                        const bName = saleBadge.querySelector('.ctn-badge-name');
+                        if (bName) bName.textContent = uName;
                         saleBadge.querySelector('.ctn-sale-val').textContent = (s * ppb).toFixed(2);
                         saleBadge.classList.remove('d-none');
                     }
                     if (purchBadge && purchInp) {
                         const p = parseFloat(purchInp.value) || 0;
+                        const bName = purchBadge.querySelector('.ctn-badge-name');
+                        if (bName) bName.textContent = uName;
                         purchBadge.querySelector('.ctn-purch-val').textContent = (p * ppb).toFixed(2);
                         purchBadge.classList.remove('d-none');
                     }
                     if (wsBadge && wsInp) {
                         const w = parseFloat(wsInp.value) || 0;
+                        const bName = wsBadge.querySelector('.ctn-badge-name');
+                        if (bName) bName.textContent = uName;
                         wsBadge.querySelector('.ctn-wsale-val').textContent = (w * ppb).toFixed(2);
                         wsBadge.classList.remove('d-none');
                     }
@@ -1571,18 +1570,18 @@
                         <div class="mob-field-group">
                             <div class="mob-label"><span class="mob-lbl-sale">${isCartonUnit(unitDropdown ? unitDropdown.value : '') ? 'Sale Price (1 Pc)' : 'Sale Price'}</span> <span class="req">*</span></div>
                             <input type="number" class="mob-input mob-sync" data-field="variant_sale_price[]" value="${escapeHtml(saleVal)}" placeholder="0.00" step="any" required>
-                            <div class="mob-ctn-hint text-primary fw-bold ${isCartonUnit(unitDropdown ? unitDropdown.value : '') ? '' : 'd-none'}" style="font-size:10px;margin-top:2px;">Ctn: <span class="mob-ctn-sale-val">${((parseFloat(saleVal)||0)*(parseFloat(convVal)||0)).toFixed(2)}</span></div>
+                            <div class="mob-ctn-hint text-primary fw-bold ${isCartonUnit(unitDropdown ? unitDropdown.value : '') ? '' : 'd-none'}" style="font-size:10px;margin-top:2px;"><span class="mob-ctn-unit-name">${getSelectedUnitName()}</span>: <span class="mob-ctn-sale-val">${((parseFloat(saleVal)||0)*(parseFloat(convVal)||0)).toFixed(2)}</span></div>
                         </div>
                         <div class="mob-field-group">
                             <div class="mob-label"><span class="mob-lbl-wsale">${isCartonUnit(unitDropdown ? unitDropdown.value : '') ? 'Wholesale (1 Pc)' : 'Wholesale Price'}</span></div>
                             <input type="number" class="mob-input mob-sync" data-field="variant_wholesale_price[]" value="${escapeHtml(wsaleVal)}" placeholder="0.00" step="any">
-                            <div class="mob-ctn-hint text-secondary fw-bold ${isCartonUnit(unitDropdown ? unitDropdown.value : '') ? '' : 'd-none'}" style="font-size:10px;margin-top:2px;">Ctn: <span class="mob-ctn-wsale-val">${((parseFloat(wsaleVal)||0)*(parseFloat(convVal)||0)).toFixed(2)}</span></div>
+                            <div class="mob-ctn-hint text-secondary fw-bold ${isCartonUnit(unitDropdown ? unitDropdown.value : '') ? '' : 'd-none'}" style="font-size:10px;margin-top:2px;"><span class="mob-ctn-unit-name">${getSelectedUnitName()}</span>: <span class="mob-ctn-wsale-val">${((parseFloat(wsaleVal)||0)*(parseFloat(convVal)||0)).toFixed(2)}</span></div>
                         </div>
                     </div>
                     <div class="mob-field-group">
                         <div class="mob-label"><span class="mob-lbl-purch">${isCartonUnit(unitDropdown ? unitDropdown.value : '') ? 'Purchase Price (1 Pc)' : 'Purchase Price'}</span> <span class="req">*</span></div>
                         <input type="number" class="mob-input mob-sync" data-field="variant_purchase_price[]" value="${escapeHtml(purchVal)}" placeholder="0.00" step="any" required>
-                        <div class="mob-ctn-hint text-success fw-bold ${isCartonUnit(unitDropdown ? unitDropdown.value : '') ? '' : 'd-none'}" style="font-size:10px;margin-top:2px;">Ctn: <span class="mob-ctn-purch-val">${((parseFloat(purchVal)||0)*(parseFloat(convVal)||0)).toFixed(2)}</span></div>
+                        <div class="mob-ctn-hint text-success fw-bold ${isCartonUnit(unitDropdown ? unitDropdown.value : '') ? '' : 'd-none'}" style="font-size:10px;margin-top:2px;"><span class="mob-ctn-unit-name">${getSelectedUnitName()}</span>: <span class="mob-ctn-purch-val">${((parseFloat(purchVal)||0)*(parseFloat(convVal)||0)).toFixed(2)}</span></div>
                     </div>
                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
                         <div class="mob-field-group">

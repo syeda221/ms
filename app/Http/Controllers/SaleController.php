@@ -152,7 +152,7 @@ class SaleController extends Controller
         $q = $request->get('q');
         $warehouseId = $request->get('warehouse_id', 1);
 
-        $products = Product::with(['brand'])
+        $products = Product::with(['brand', 'unit'])
             ->leftJoin('warehouse_stocks', function ($join) use ($warehouseId) {
                 $join->on('products.id', '=', 'warehouse_stocks.product_id')
                     ->where('warehouse_stocks.warehouse_id', $warehouseId);
@@ -2376,7 +2376,7 @@ class SaleController extends Controller
                 'item_name' => $item->is_manual ? ($item->product_name ?? 'Manual Product') . ' (Manual)' : ($item->product_name ?? $item->product->item_name ?? 'Item'),
                 'item_code' => $item->product->item_code ?? '',
                 'brand' => $item->product->brand->name ?? '',
-                'unit' => $item->product->unit->name ?? '', // Access name if relation exists
+                'unit' => $item->product->unit_name ?? ($item->product->unit->name ?? ''),
                 'qty' => (int) $totalPcs, // Use Pieces for Return Logic (Matches Price-Per-Piece)
                 'qty_box' => (float) $item->qty, // Store Box Count separately
                 'total_pieces' => (int) $totalPcs,

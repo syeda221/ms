@@ -273,10 +273,10 @@
                         $loosePieces = $totalPieces % $piecesPerBox;
 
                         $qtyStr = "";
-                        $cStr = ($sizeMode === 'by_bandal') ? 'Bndl' : 'Ctn';
+                        $cStr = !empty($item['unit']) ? $item['unit'] : (!empty($item['variant_unit']) && !in_array(strtolower($item['variant_unit']), ['pcs','piece','pieces']) ? $item['variant_unit'] : (($sizeMode === 'by_bandal') ? 'Bndl' : 'Ctn'));
                         if ($sizeMode == 'by_pieces') {
                             $qtyStr = "{$totalPieces} Pcs";
-                        } elseif (in_array($sizeMode, ['by_cartons', 'by_bandal']) || $piecesPerBox > 1) {
+                        } elseif (\App\Models\Product::isCartonMode($sizeMode) || $piecesPerBox > 1) {
                             if ($boxes > 0 && $loosePieces > 0) {
                                 $qtyStr = "{$boxes} {$cStr} + {$loosePieces} Pcs";
                             } elseif ($boxes > 0) {

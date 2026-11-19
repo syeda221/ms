@@ -372,13 +372,13 @@
                             };
                             $qtyVal = (float)($item['qty_box'] ?? $item['qty'] ?? $totalPieces);
                             $qtyDisplay = ($qtyVal == (int)$qtyVal ? (int)$qtyVal : number_format($qtyVal, 3)) . ' ' . $uomLabel;
-                        } elseif (in_array($sizeMode, ['by_cartons', 'by_bandal']) || $sizeMode == 'by_size') {
+                        } elseif (\App\Models\Product::isCartonMode($sizeMode) || $sizeMode == 'by_size') {
                             $piecesPerBox = (int)($item['pieces_per_box'] ?? 1);
                             if ($piecesPerBox <= 0) $piecesPerBox = 1;
                             $boxes = floor($totalPieces / $piecesPerBox);
                             $loose = $totalPieces % $piecesPerBox;
 
-                            $cLabel = ($sizeMode === 'by_bandal') ? 'Bndl' : 'Ctn';
+                            $cLabel = !empty($item['unit']) ? $item['unit'] : (!empty($item['variant_unit']) && !in_array(strtolower($item['variant_unit']), ['pcs','piece','pieces']) ? $item['variant_unit'] : (($sizeMode === 'by_bandal') ? 'Bndl' : 'Ctn'));
                             if ($boxes > 0 && $loose > 0) {
                                 $qtyDisplay = "{$boxes} {$cLabel} + {$loose} Pcs";
                             } elseif ($boxes > 0) {
