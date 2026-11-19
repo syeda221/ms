@@ -1332,7 +1332,7 @@ class SaleController extends Controller
                         $lineGross = $discount < 100 ? round($frontendNet / (1 - ($discount / 100)), 2) : $frontendNet;
                     }
                 } else {
-                    if (in_array($sizeMode, ['by_cartons', 'by_bandal'])) {
+                    if (Product::isCartonMode($sizeMode)) {
                         $subUnit = $request->sub_unit_mode[$index] ?? 'main';
                         if ($subUnit === 'pcs') {
                             $lineGross = $totalPieces * $dbPrice;
@@ -1942,13 +1942,13 @@ class SaleController extends Controller
                 // Ensure we respect the unit toggle for by_pieces and by_cartons products as well
                 if ($unit === 'pcs' || $unit === 'piece' || $unit === 'pieces') {
                     $qtyPieces = (float)$item->qty;
-                } elseif ($unit === 'carton' || $unit === 'ctn' || $unit === 'cbn' || $unit === 'box') {
+                } elseif ($unit === 'carton' || $unit === 'ctn' || $unit === 'cbn' || $unit === 'box' || Product::isCartonMode($productMode)) {
                     $ppb = (float)($item->product->pieces_per_box ?? 1);
                     if (isset($factor) && $factor > 0 && $factor != 1.0) {
                         $ppb = $factor;
                     }
                     if ($ppb <= 0) $ppb = 1;
-                    $qtyPieces = ((float)$item->qty) * $ppb;
+                    $qtyPieces = ((float)$item->total_pieces > 0) ? (float)$item->total_pieces : (((float)$item->qty) * $ppb);
                 } else {
                     $qtyPieces = (float)$item->total_pieces > 0 ? (float)$item->total_pieces : (float)$item->qty;
                 }
@@ -2040,7 +2040,7 @@ class SaleController extends Controller
         }
 
         $vUnitName = $matched['unit'] ?? '';
-        $isCartonMode = (in_array($product->size_mode, ['by_cartons', 'by_bandal']) || strtolower($vUnitName) === 'carton');
+        $isCartonMode = (Product::isCartonMode($product->size_mode) || strtolower($vUnitName) === 'carton');
         $ppb = (float) ($product->pieces_per_box ?? 1);
         if ($isCartonMode) {
             $vConv = (float) ($matched['conv_factor'] ?? 0);

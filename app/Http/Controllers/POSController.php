@@ -192,7 +192,7 @@ class POSController extends Controller
                             $pcsCount = (int) floor($vBalance);
                             $vStockDisplay = "{$pcsCount}";
                         }
-                    } elseif ((in_array($p->size_mode, ['by_cartons', 'by_bandal']) || $p->size_mode === 'by_size') && $ppb > 1) {
+                    } elseif ((\App\Models\Product::isCartonMode($p->size_mode) || $p->size_mode === 'by_size') && $ppb > 1) {
                         $vBoxes = floor($vBalance / $ppb);
                         $vLoose = $vBalance % $ppb;
                         $vStockDisplay = $vLoose > 0 ? "$vBoxes.$vLoose" : $vBoxes;
@@ -219,7 +219,7 @@ class POSController extends Controller
                     $totalStockPieces = (float) $p->warehouseStocks->sum('total_pieces');
                 }
                 $totalStockDisplay = $totalStockPieces;
-                if ((in_array($p->size_mode, ['by_cartons', 'by_bandal']) || $p->size_mode === 'by_size') && $ppb > 1) {
+                if ((\App\Models\Product::isCartonMode($p->size_mode) || $p->size_mode === 'by_size') && $ppb > 1) {
                     $boxes = floor($totalStockPieces / $ppb);
                     $loose = $totalStockPieces % $ppb;
                     $totalStockDisplay = $loose > 0 ? "$boxes.$loose" : $boxes;
@@ -243,7 +243,7 @@ class POSController extends Controller
             } else {
                 $stockPieces = (float) ($p->warehouseStocks->sum('total_pieces') ?? 0);
                 $stockDisplay = $stockPieces;
-                if ((in_array($p->size_mode, ['by_cartons', 'by_bandal']) || $p->size_mode === 'by_size') && $ppb > 1) {
+                if ((\App\Models\Product::isCartonMode($p->size_mode) || $p->size_mode === 'by_size') && $ppb > 1) {
                     $boxes = floor($stockPieces / $ppb);
                     $loose = $stockPieces % $ppb;
                     $stockDisplay = $loose > 0 ? "$boxes.$loose" : $boxes;

@@ -1748,8 +1748,8 @@ class ReportingController extends Controller
 
                     // Determine Unit Badge
                     $unitBadge = '';
-                    if (in_array($product->size_mode, ['by_cartons', 'by_bandal'])) {
-                        $cartonLbl = ($product->size_mode === 'by_bandal') ? 'Bundal' : 'Carton';
+                    if (\App\Models\Product::isCartonMode($product->size_mode)) {
+                        $cartonLbl = $product->unit_name ?? (($product->size_mode === 'by_bandal') ? 'Bundal' : 'Carton');
                         $unitBadge = "{$cartonLbl} ({$ppb} pcs/" . strtolower($cartonLbl) . ")";
                     } elseif ($product->size_mode === 'by_kg') {
                         $unitBadge = "Kg";
@@ -1766,10 +1766,10 @@ class ReportingController extends Controller
                     }
 
                     // Format Sold / Returned Qty
-                    if (in_array($product->size_mode, ['by_cartons', 'by_bandal'])) {
-                        $ctnLbl = ($product->size_mode === 'by_bandal') ? 'Bndl' : 'Ctn';
-                        $cartonFull = ($product->size_mode === 'by_bandal') ? 'Bundal' : 'Carton';
-                        $cartonFulls = ($product->size_mode === 'by_bandal') ? 'Bundals' : 'Cartons';
+                    if (\App\Models\Product::isCartonMode($product->size_mode)) {
+                        $ctnLbl = $product->unit_name ?? (($product->size_mode === 'by_bandal') ? 'Bndl' : 'Ctn');
+                        $cartonFull = $product->unit_name ?? (($product->size_mode === 'by_bandal') ? 'Bundal' : 'Carton');
+                        $cartonFulls = $cartonFull;
                         $soldBoxes = (int) floor($soldQtyPieces / $ppb);
                         $soldLoose = (int) round($soldQtyPieces - ($soldBoxes * $ppb));
                         if ($soldBoxes > 0 && $soldLoose > 0) {

@@ -132,7 +132,7 @@ class ProductController extends Controller
             };
 
             $stockDisplay = $stockPieces;
-            if ((in_array($p->size_mode, ['by_cartons', 'by_bandal']) || $p->size_mode === 'by_size') && $ppb > 1) {
+            if ((Product::isCartonMode($p->size_mode) || $p->size_mode === 'by_size') && $ppb > 1) {
                 $boxes = floor($stockPieces / $ppb);
                 $loose = $stockPieces % $ppb;
                 $stockDisplay = $loose > 0 ? "$boxes.$loose" : $boxes;
@@ -217,7 +217,7 @@ class ProductController extends Controller
                     $vName = ($v['name'] ?? $p->item_name) . $size . $color;
                     
                     $vUnitName = $v['unit'] ?? $unitName;
-                    $isCartonMode = (in_array($p->size_mode, ['by_cartons', 'by_bandal']) || strtolower($vUnitName) === 'carton');
+                    $isCartonMode = (Product::isCartonMode($p->size_mode) || strtolower($vUnitName) === 'carton');
                     $vPpb = (float) ($p->pieces_per_box ?? 1);
                     if ($isCartonMode) {
                         $vConv = (float) ($v['conv_factor'] ?? 0);
@@ -334,7 +334,7 @@ class ProductController extends Controller
                             $pcsCount = (int) floor($vBalance);
                             $vStockDisplay = "{$pcsCount}";
                         }
-                    } elseif ((in_array($p->size_mode, ['by_cartons', 'by_bandal']) || $p->size_mode === 'by_size') && $vPpb > 1) {
+                    } elseif ((Product::isCartonMode($p->size_mode) || $p->size_mode === 'by_size') && $vPpb > 1) {
                         $vBoxes = (int) floor($vBalance / $vPpb);
                         $vLoose = (int) round($vBalance - ($vBoxes * $vPpb));
                         $vStockDisplay = $vLoose > 0 ? "$vBoxes.$vLoose" : $vBoxes;
@@ -424,7 +424,7 @@ class ProductController extends Controller
             $stockDisplay = $stockPieces;
             $ppb = $p->pieces_per_box > 0 ? $p->pieces_per_box : 1;
 
-            if ((in_array($p->size_mode, ['by_cartons', 'by_bandal']) || $p->size_mode === 'by_size') && $p->pieces_per_box > 0) {
+            if ((Product::isCartonMode($p->size_mode) || $p->size_mode === 'by_size') && $p->pieces_per_box > 0) {
                 $boxes = floor($stockPieces / $ppb);
                 $loose = $stockPieces % $ppb;
                 $stockDisplay = $loose > 0 ? "$boxes.$loose" : $boxes;
