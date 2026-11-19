@@ -656,6 +656,29 @@
                     .replace(/>/g, '&gt;');
             }
 
+            const allAvailableUnits = @json(isset($units) ? $units->pluck('name') : []);
+
+            function renderUnitOptions(selectedUnit, uNorm, isCartonMode, isNewRow = false) {
+                const selUnit = selectedUnit || 'Pcs';
+                const norm = (uNorm || '').toLowerCase().trim();
+                let html = `<option value="${escapeHtml(selUnit)}" ${(norm === selUnit.toLowerCase() || (isCartonMode && isNewRow)) ? 'selected' : ''}>${escapeHtml(selUnit)}</option>`;
+                if (selUnit.toLowerCase() !== 'pcs') {
+                    const isPcsSelected = (!isCartonMode && ['pcs', 'piece', 'pieces', 'pc'].includes(norm));
+                    html += `<option value="Pcs" ${isPcsSelected ? 'selected' : ''}>Pcs</option>`;
+                }
+                if (Array.isArray(allAvailableUnits)) {
+                    allAvailableUnits.forEach(uName => {
+                        if (!uName) return;
+                        const uLower = uName.toLowerCase().trim();
+                        if (uLower !== selUnit.toLowerCase() && uLower !== 'pcs') {
+                            const isSel = (norm === uLower);
+                            html += `<option value="${escapeHtml(uName)}" ${isSel ? 'selected' : ''}>${escapeHtml(uName)}</option>`;
+                        }
+                    });
+                }
+                return html;
+            }
+
             // Sync base variant name with product name
             if (productNameInput) {
                 productNameInput.addEventListener('input', function() {
@@ -702,11 +725,7 @@
                     <td class="p-1"><input type="text" class="form-control-pro form-control-sm" name="variant_color[]" value="${escapeHtml(colorVal)}" placeholder="Color"></td>
                     <td class="p-1">
                         <select class="form-select form-select-sm fw-bold text-primary px-1" name="variant_unit[]" style="font-size:11px;">
-                            <option value="${baseUnitName}" ${uNorm===baseUnitName.toLowerCase()||(isCartonMode && !v)?'selected':''}>${baseUnitName}</option>
-                            ${baseUnitName !== 'Pcs' ? '<option value="Pcs" ' + ((!isCartonMode && (uNorm===\'pcs\'||uNorm===\'piece\'||uNorm===\'pieces\'||uNorm===\'pc\'))?\'selected\':\'\') + '>Pcs</option>' : ''}
-                            @foreach($units as $u)
-                            ${baseUnitName !== '{{ $u->name }}' && '{{ $u->name }}' !== 'Pcs' ? '<option value="{{ $u->name }}" ' + (uNorm === '{{ strtolower($u->name) }}' ? 'selected' : '') + '>{{ $u->name }}</option>' : ''}
-                            @endforeach
+                            ${renderUnitOptions(baseUnitName, uNorm, isCartonMode, !v)}
                         </select>
                     </td>
                     <td class="p-1">
@@ -892,11 +911,7 @@
                     <td class="p-1"><input type="text" class="form-control-pro form-control-sm" name="variant_color[]" value="${escapeHtml(colorVal)}" placeholder="Color"></td>
                     <td class="p-1">
                         <select class="form-select form-select-sm px-1 fw-bold text-dark" name="variant_unit[]" style="font-size:11px;">
-                            <option value="${curUnitName}" ${uNorm===curUnitName.toLowerCase()||(isCartonMode && !v)?'selected':''}>${curUnitName}</option>
-                            ${curUnitName !== 'Pcs' ? '<option value="Pcs" ' + ((!isCartonMode && (uNorm===\'pcs\'||uNorm===\'piece\'||uNorm===\'pieces\'||uNorm===\'pc\'))?\'selected\':\'\') + '>Pcs</option>' : ''}
-                            @foreach($units as $u)
-                            ${curUnitName !== '{{ $u->name }}' && '{{ $u->name }}' !== 'Pcs' ? '<option value="{{ $u->name }}" ' + (uNorm === '{{ strtolower($u->name) }}' ? 'selected' : '') + '>{{ $u->name }}</option>' : ''}
-                            @endforeach
+                            ${renderUnitOptions(curUnitName, uNorm, isCartonMode, !v)}
                         </select>
                     </td>
                     <td class="p-1">
