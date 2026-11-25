@@ -164,18 +164,24 @@ class SaleController extends Controller
             Product::applyTokenSearchFilter($query, $q, 'products');
         }
 
-        $products = $query->select(
+        $query->select(
                 'products.*',
                 'warehouse_stocks.total_pieces as wh_stock',
                 'warehouse_stocks.quantity as wh_box_qty'
-            )
-            ->limit(empty($tokens) ? 50 : 150)
-            ->get();
+            );
 
-        if (!empty($tokens)) {
-            $products = $products->filter(function ($product) use ($tokens) {
-                return $product->matchSearchTermDetails($tokens)['matched'];
-            })->take(50)->values();
+        if (empty($tokens)) {
+            $products = $query->limit(50)->get();
+        } elseif (!Product::hasNonAscii($q)) {
+            $products = $query->limit(150)->get()
+                ->filter(fn ($product) => $product->matchSearchTermDetails($tokens)['matched'])
+                ->take(50)
+                ->values();
+        } else {
+            $products = $query->get()
+                ->filter(fn ($product) => $product->matchSearchTermDetails($tokens)['matched'])
+                ->take(50)
+                ->values();
         }
 
         return response()->json($products);

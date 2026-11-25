@@ -92,6 +92,31 @@
         return $('<div>').text(str == null ? '' : String(str)).html();
     }
 
+    function decodeBase64Json(b64) {
+        if (!b64) return {};
+        try {
+            const binStr = atob(b64);
+            if (typeof TextDecoder !== 'undefined') {
+                const bytes = Uint8Array.from(binStr, c => c.charCodeAt(0));
+                return JSON.parse(new TextDecoder().decode(bytes));
+            }
+            return JSON.parse(decodeURIComponent(escape(binStr)));
+        } catch (e) {
+            return JSON.parse(atob(b64));
+        }
+    }
+
+    function encodeBase64Json(obj) {
+        const json = JSON.stringify(obj);
+        if (typeof TextEncoder !== 'undefined') {
+            const bytes = new TextEncoder().encode(json);
+            let binStr = '';
+            bytes.forEach(b => { binStr += String.fromCharCode(b); });
+            return btoa(binStr);
+        }
+        return btoa(unescape(encodeURIComponent(json)));
+    }
+
     function formatProduct(repo) {
         if (repo.loading) return repo.text;
         let stock = repo.stock !== undefined ? repo.stock : 0;
@@ -1020,7 +1045,7 @@
             let variantStock = null;
             if (data.variant_data) {
                 try {
-                    const vd = JSON.parse(atob(data.variant_data));
+                    const vd = decodeBase64Json(data.variant_data);
                     variantSize = (vd.size && vd.size !== '-') ? vd.size : '-';
                     variantColor = (vd.color && vd.color !== '-') ? vd.color : '-';
                     // Prefer vd.current_stock from parsed variant_data (highly reliable), fallback to data.stock or vd.stock
@@ -1362,8 +1387,7 @@
             const existingVd = $row.find('.variant-data-hidden').val();
             if (existingVd) {
                 try {
-                    const decoded = atob(existingVd);
-                    variantData = JSON.parse(decoded);
+                    variantData = decodeBase64Json(existingVd);
                 } catch(e) {
                     try {
                         variantData = JSON.parse(existingVd);
@@ -1378,7 +1402,7 @@
                 variantData = { color: $row.find('.color-display').val() || '-' };
             }
             variantData.size = newSize;
-            $row.find('.variant-data-hidden').val(btoa(JSON.stringify(variantData)));
+            $row.find('.variant-data-hidden').val(encodeBase64Json(variantData));
         });
 
         // Delete Row

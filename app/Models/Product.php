@@ -149,6 +149,59 @@ class Product extends Model
     }
 
     /**
+     * Check whether a string contains any non-ASCII (e.g. Urdu/Arabic) characters.
+     */
+    public static function hasNonAscii(?string $text): bool
+    {
+        return preg_match('/[^\x00-\x7F]/', (string) $text) === 1;
+    }
+
+    /**
+     * Normalize text for search across Latin, Urdu, and Arabic script variations.
+     */
+    public static function normalizeSearchText(?string $text): string
+    {
+        $str = trim((string) $text);
+        if ($str === '') {
+            return '';
+        }
+
+        $str = mb_strtolower($str, 'UTF-8');
+
+        // Strip Arabic/Urdu diacritics (harakat) and tatweel
+        $str = preg_replace('/[\x{064B}-\x{065F}\x{0670}\x{06D6}-\x{06ED}\x{0640}]/u', '', $str) ?? $str;
+        // Turn zero-width joiners/markers into word boundaries
+        $str = str_replace(["\u{200C}", "\u{200D}", "\u{200E}", "\u{200F}"], ' ', $str);
+
+        // Normalize common Urdu/Arabic keyboard character variations & Urdu/Arabic digits
+        static $charMap = [
+            'ي' => 'ی',
+            'ى' => 'ی',
+            'ئ' => 'ی',
+            'ې' => 'ی',
+            'ك' => 'ک',
+            'ه' => 'ہ',
+            'ھ' => 'ہ',
+            'ۂ' => 'ہ',
+            'ۃ' => 'ہ',
+            'ة' => 'ہ',
+            'أ' => 'ا',
+            'إ' => 'ا',
+            'آ' => 'ا',
+            'ٱ' => 'ا',
+            'ؤ' => 'و',
+            'ۓ' => 'ے',
+            '۰' => '0', '۱' => '1', '۲' => '2', '۳' => '3', '۴' => '4',
+            '۵' => '5', '۶' => '6', '۷' => '7', '۸' => '8', '۹' => '9',
+            '٠' => '0', '١' => '1', '٢' => '2', '٣' => '3', '٤' => '4',
+            '٥' => '5', '٦' => '6', '٧' => '7', '٨' => '8', '٩' => '9',
+        ];
+        $str = strtr($str, $charMap);
+
+        return preg_replace('/\s+/u', ' ', trim($str)) ?? '';
+    }
+
+    /**
      * Split a search query into normalized lowercase tokens.
      */
     public static function tokenizeSearchTerm(?string $term): array
@@ -163,7 +216,7 @@ class Product extends Model
     }
 
     /**
-     * Check if every token appears within the given haystack (case-insensitive).
+     * Check if every token appears within the given haystack (case- and script-normalized).
      */
     public static function tokensMatchHaystack(array $tokens, string $haystack): bool
     {
@@ -171,18 +224,44 @@ class Product extends Model
             return true;
         }
 
-        $lower = mb_strtolower($haystack, 'UTF-8');
+        $normalizedHaystack = self::normalizeSearchText($haystack);
+        if ($normalizedHaystack === '') {
+            return false;
+        }
+
+        $allMatchAsTokens = true;
+        $normalizedTokens = [];
         foreach ($tokens as $token) {
-            if (mb_strpos($lower, $token, 0, 'UTF-8') === false) {
-                return false;
+            $normTok = self::normalizeSearchText($token);
+            if ($normTok === '') {
+                continue;
+            }
+            $normalizedTokens[] = $normTok;
+            if (mb_strpos($normalizedHaystack, $normTok, 0, 'UTF-8') === false) {
+                $allMatchAsTokens = false;
             }
         }
 
-        return true;
+        if ($allMatchAsTokens) {
+            return true;
+        }
+
+        // Allow space-insensitive matching (e.g. "سیری لیک" <-> "سیریلیک", "cola next" <-> "colanext")
+        if (!empty($normalizedTokens)) {
+            $compactQuery = str_replace(' ', '', implode('', $normalizedTokens));
+            $compactHaystack = str_replace(' ', '', $normalizedHaystack);
+            if ($compactQuery !== '' && mb_strpos($compactHaystack, $compactQuery, 0, 'UTF-8') !== false) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
      * Apply a token-based SQL candidate filter across base fields and variant JSON.
+     * Non-ASCII tokens (e.g. Urdu/Arabic) are verified in PHP so JSON \uXXXX escapes
+     * and Urdu/Arabic keyboard character variations are never missed by MySQL LIKE.
      */
     public static function applyTokenSearchFilter($query, ?string $term, string $table = '', array $extraRelations = []): void
     {
@@ -194,6 +273,10 @@ class Product extends Model
         $prefix = $table !== '' ? ($table . '.') : '';
 
         foreach ($tokens as $tok) {
+            if (self::hasNonAscii($tok)) {
+                continue;
+            }
+
             $like = '%' . $tok . '%';
             $escapedSlashLike = str_contains($tok, '/') ? ('%' . str_replace('/', '\\/', $tok) . '%') : null;
 
@@ -217,11 +300,45 @@ class Product extends Model
     }
 
     /**
-     * Evaluate whether this product and/or specific variants match the search tokens.
+     * Evaluate whether a product row (Model or stdClass) and/or specific variants match the search tokens.
      */
-    public function matchSearchTermDetails(array $tokens): array
+    public static function matchRowSearchTermDetails(object $row, array $tokens): array
     {
-        $variants = self::parseVariantsFromColor($this->color);
+        $rawColor = $row->color ?? null;
+        $rawName = (string) ($row->item_name ?? '');
+        $rawCode = (string) ($row->item_code ?? '');
+        $rawBarcode = (string) ($row->barcode_path ?? '');
+
+        // Fast skip for non-ASCII queries over pure-ASCII rows without \u escapes
+        if (!empty($tokens)) {
+            $queryHasNonAscii = false;
+            foreach ($tokens as $tok) {
+                if (self::hasNonAscii($tok)) {
+                    $queryHasNonAscii = true;
+                    break;
+                }
+            }
+            if ($queryHasNonAscii) {
+                $colorStr = is_string($rawColor) ? $rawColor : '';
+                if (
+                    !self::hasNonAscii($rawName)
+                    && !self::hasNonAscii($rawCode)
+                    && !self::hasNonAscii($rawBarcode)
+                    && !self::hasNonAscii($colorStr)
+                    && stripos($colorStr, '\\u') === false
+                ) {
+                    return [
+                        'matched' => false,
+                        'base_matched' => false,
+                        'matched_variant_indexes' => [],
+                        'combined_variant_indexes' => [],
+                        'variants' => [],
+                    ];
+                }
+            }
+        }
+
+        $variants = self::parseVariantsFromColor($rawColor);
 
         if (empty($tokens)) {
             $allIndexes = array_keys($variants);
@@ -234,11 +351,7 @@ class Product extends Model
             ];
         }
 
-        $baseHaystack = trim(
-            ($this->item_name ?? '') . ' ' .
-            ($this->item_code ?? '') . ' ' .
-            ($this->barcode_path ?? '')
-        );
+        $baseHaystack = trim($rawName . ' ' . $rawCode . ' ' . $rawBarcode);
         $baseMatched = self::tokensMatchHaystack($tokens, $baseHaystack);
 
         if (!empty($variants)) {
@@ -277,13 +390,13 @@ class Product extends Model
         }
 
         $legacyMatched = false;
-        if (!$baseMatched && !empty($this->color)) {
-            $decoded = is_string($this->color) ? json_decode($this->color, true) : $this->color;
+        if (!$baseMatched && !empty($rawColor)) {
+            $decoded = is_string($rawColor) ? json_decode($rawColor, true) : $rawColor;
             if (is_array($decoded)) {
                 $flatStrings = array_filter($decoded, 'is_scalar');
                 $legacyText = implode(' ', $flatStrings);
             } else {
-                $legacyText = (string) $this->color;
+                $legacyText = (string) $rawColor;
             }
             if ($legacyText !== '') {
                 $legacyMatched = self::tokensMatchHaystack($tokens, trim($baseHaystack . ' ' . $legacyText));
@@ -297,6 +410,14 @@ class Product extends Model
             'combined_variant_indexes' => [],
             'variants' => [],
         ];
+    }
+
+    /**
+     * Evaluate whether this product and/or specific variants match the search tokens.
+     */
+    public function matchSearchTermDetails(array $tokens): array
+    {
+        return self::matchRowSearchTermDetails($this, $tokens);
     }
 
     protected static function booted()

@@ -1196,10 +1196,37 @@
 
         let pendingVariantFilter = '';
 
+        function posNormalizeText(str) {
+            if (!str) return '';
+            const charMap = {
+                '\u064A': '\u06CC', '\u0649': '\u06CC', '\u0626': '\u06CC', '\u06D0': '\u06CC',
+                '\u0643': '\u06A9',
+                '\u0647': '\u06C1', '\u06BE': '\u06C1', '\u06C2': '\u06C1', '\u06C3': '\u06C1', '\u0629': '\u06C1',
+                '\u0623': '\u0627', '\u0625': '\u0627', '\u0622': '\u0627', '\u0671': '\u0627',
+                '\u0624': '\u0648', '\u06D3': '\u06D2',
+                '\u06F0':'0','\u06F1':'1','\u06F2':'2','\u06F3':'3','\u06F4':'4',
+                '\u06F5':'5','\u06F6':'6','\u06F7':'7','\u06F8':'8','\u06F9':'9',
+                '\u0660':'0','\u0661':'1','\u0662':'2','\u0663':'3','\u0664':'4',
+                '\u0665':'5','\u0666':'6','\u0667':'7','\u0668':'8','\u0669':'9'
+            };
+            return str.toString().toLowerCase()
+                .replace(/[\u064B-\u065F\u0670\u06D6-\u06ED\u0640]/g, '')
+                .replace(/[\u200C\u200D\u200E\u200F]/g, ' ')
+                .replace(/[\u064A\u0649\u0626\u06D0\u0643\u0647\u06BE\u06C2\u06C3\u0629\u0623\u0625\u0622\u0671\u0624\u06D3\u06F0-\u06F9\u0660-\u0669]/g, ch => charMap[ch] || ch)
+                .replace(/\s+/g, ' ')
+                .trim();
+        }
+
         function posTokensMatch(tokens, haystack) {
             if (!tokens.length) return true;
-            const lower = (haystack || '').toString().toLowerCase();
-            return tokens.every(tok => lower.includes(tok));
+            const normHaystack = posNormalizeText(haystack);
+            if (!normHaystack) return false;
+            const normTokens = tokens.map(t => posNormalizeText(t)).filter(Boolean);
+            if (!normTokens.length) return true;
+            if (normTokens.every(tok => normHaystack.includes(tok))) return true;
+            const compactQuery = normTokens.join('').replace(/\s+/g, '');
+            const compactHaystack = normHaystack.replace(/\s+/g, '');
+            return compactQuery !== '' && compactHaystack.includes(compactQuery);
         }
 
         // Filter Grid Products via Search Input (Base + Variants)

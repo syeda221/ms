@@ -135,8 +135,8 @@ class ProductController extends Controller
             Product::applyTokenSearchFilter($candidatesQuery, $term);
 
             $prioritized = [];
-            foreach ($candidatesQuery->get() as $candidate) {
-                $details = $candidate->matchSearchTermDetails($tokens);
+            foreach ($candidatesQuery->toBase()->get() as $candidate) {
+                $details = Product::matchRowSearchTermDetails($candidate, $tokens);
                 if (!$details['matched']) {
                     continue;
                 }
@@ -489,7 +489,9 @@ class ProductController extends Controller
             Product::applyTokenSearchFilter($query, $term, '', ['category_relation', 'sub_category_relation', 'brand']);
         }
 
-        $products = $query->limit(500)->get();
+        $products = Product::hasNonAscii($term)
+            ? $query->get()
+            : $query->limit(500)->get();
 
         if (!empty($tokens)) {
             $products = $products->filter(function ($p) use ($tokens) {
@@ -502,7 +504,7 @@ class ProductController extends Controller
                     ($p->brand->name ?? '')
                 );
                 return Product::tokensMatchHaystack($tokens, $relHaystack);
-            })->values();
+            })->take(500)->values();
         }
 
         return response()->json($products->map(function ($p, $key) {
@@ -953,7 +955,7 @@ class ProductController extends Controller
                 'brand_id' => $request->brand_id,
                 'model' => $request->model,
                 'image' => $imagePath,
-                'color' => count($variants) > 0 ? json_encode($variants) : ($request->color ? json_encode($request->color) : null),
+                'color' => count($variants) > 0 ? json_encode($variants, JSON_UNESCAPED_UNICODE) : ($request->color ? json_encode($request->color, JSON_UNESCAPED_UNICODE) : null),
                 'purchase_discount_percent' => $purchaseDiscountPercent,
                 'sale_discount_percent' => $saleDiscountPercent,
                 'alert_quantity' => $request->alert_quantity,
@@ -1338,9 +1340,9 @@ class ProductController extends Controller
             // color update logic
             $final_color = null;
             if (count($variants) > 0) {
-                $final_color = json_encode($variants);
+                $final_color = json_encode($variants, JSON_UNESCAPED_UNICODE);
             } else if ($request->has('color')) {
-                $final_color = json_encode($request->color);
+                $final_color = json_encode($request->color, JSON_UNESCAPED_UNICODE);
             } else {
                 // keep old color if not submitted
                 $final_color = Product::where('id', $id)->value('color');
