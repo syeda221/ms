@@ -126,6 +126,179 @@ class Product extends Model
         return self::isCartonMode($this->size_mode);
     }
 
+    /**
+     * Parse structured variant objects from the product's `color` JSON column.
+     */
+    public static function parseVariantsFromColor($rawColor): array
+    {
+        if (empty($rawColor)) {
+            return [];
+        }
+
+        $parsed = is_string($rawColor) ? json_decode($rawColor, true) : $rawColor;
+        if (!is_array($parsed) || empty($parsed)) {
+            return [];
+        }
+
+        $values = array_values($parsed);
+        if (isset($values[0]) && is_array($values[0]) && array_key_exists('name', $values[0])) {
+            return $values;
+        }
+
+        return [];
+    }
+
+    /**
+     * Split a search query into normalized lowercase tokens.
+     */
+    public static function tokenizeSearchTerm(?string $term): array
+    {
+        $trimmed = trim((string) $term);
+        if ($trimmed === '') {
+            return [];
+        }
+
+        $parts = preg_split('/\s+/u', mb_strtolower($trimmed, 'UTF-8'), -1, PREG_SPLIT_NO_EMPTY);
+        return is_array($parts) ? $parts : [];
+    }
+
+    /**
+     * Check if every token appears within the given haystack (case-insensitive).
+     */
+    public static function tokensMatchHaystack(array $tokens, string $haystack): bool
+    {
+        if (empty($tokens)) {
+            return true;
+        }
+
+        $lower = mb_strtolower($haystack, 'UTF-8');
+        foreach ($tokens as $token) {
+            if (mb_strpos($lower, $token, 0, 'UTF-8') === false) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Apply a token-based SQL candidate filter across base fields and variant JSON.
+     */
+    public static function applyTokenSearchFilter($query, ?string $term, string $table = '', array $extraRelations = []): void
+    {
+        $tokens = self::tokenizeSearchTerm($term);
+        if (empty($tokens)) {
+            return;
+        }
+
+        $prefix = $table !== '' ? ($table . '.') : '';
+
+        foreach ($tokens as $tok) {
+            $like = '%' . $tok . '%';
+            $escapedSlashLike = str_contains($tok, '/') ? ('%' . str_replace('/', '\\/', $tok) . '%') : null;
+
+            $query->where(function ($q) use ($like, $escapedSlashLike, $prefix, $extraRelations) {
+                $q->where($prefix . 'item_name', 'like', $like)
+                    ->orWhere($prefix . 'item_code', 'like', $like)
+                    ->orWhere($prefix . 'barcode_path', 'like', $like)
+                    ->orWhere($prefix . 'color', 'like', $like);
+
+                if ($escapedSlashLike !== null) {
+                    $q->orWhere($prefix . 'color', 'like', $escapedSlashLike);
+                }
+
+                foreach ($extraRelations as $relation) {
+                    $q->orWhereHas($relation, function ($rq) use ($like) {
+                        $rq->where('name', 'like', $like);
+                    });
+                }
+            });
+        }
+    }
+
+    /**
+     * Evaluate whether this product and/or specific variants match the search tokens.
+     */
+    public function matchSearchTermDetails(array $tokens): array
+    {
+        $variants = self::parseVariantsFromColor($this->color);
+
+        if (empty($tokens)) {
+            $allIndexes = array_keys($variants);
+            return [
+                'matched' => true,
+                'base_matched' => true,
+                'matched_variant_indexes' => $allIndexes,
+                'combined_variant_indexes' => $allIndexes,
+                'variants' => $variants,
+            ];
+        }
+
+        $baseHaystack = trim(
+            ($this->item_name ?? '') . ' ' .
+            ($this->item_code ?? '') . ' ' .
+            ($this->barcode_path ?? '')
+        );
+        $baseMatched = self::tokensMatchHaystack($tokens, $baseHaystack);
+
+        if (!empty($variants)) {
+            $matchedVariantIndexes = [];
+            $combinedVariantIndexes = [];
+
+            foreach ($variants as $idx => $v) {
+                $vSize = trim((string) ($v['size'] ?? ''));
+                $vColor = trim((string) ($v['color'] ?? ''));
+
+                $variantOwnHaystack = trim(
+                    ($v['name'] ?? '') . ' ' .
+                    (($vSize !== '' && $vSize !== '-') ? $vSize : '') . ' ' .
+                    (($vColor !== '' && $vColor !== '-') ? $vColor : '') . ' ' .
+                    ($v['barcode'] ?? '') . ' ' .
+                    ($v['unit'] ?? '')
+                );
+
+                $combinedHaystack = trim($baseHaystack . ' ' . $variantOwnHaystack);
+
+                if (self::tokensMatchHaystack($tokens, $variantOwnHaystack)) {
+                    $matchedVariantIndexes[] = $idx;
+                    $combinedVariantIndexes[] = $idx;
+                } elseif (self::tokensMatchHaystack($tokens, $combinedHaystack)) {
+                    $combinedVariantIndexes[] = $idx;
+                }
+            }
+
+            return [
+                'matched' => $baseMatched || !empty($combinedVariantIndexes),
+                'base_matched' => $baseMatched,
+                'matched_variant_indexes' => $matchedVariantIndexes,
+                'combined_variant_indexes' => $combinedVariantIndexes,
+                'variants' => $variants,
+            ];
+        }
+
+        $legacyMatched = false;
+        if (!$baseMatched && !empty($this->color)) {
+            $decoded = is_string($this->color) ? json_decode($this->color, true) : $this->color;
+            if (is_array($decoded)) {
+                $flatStrings = array_filter($decoded, 'is_scalar');
+                $legacyText = implode(' ', $flatStrings);
+            } else {
+                $legacyText = (string) $this->color;
+            }
+            if ($legacyText !== '') {
+                $legacyMatched = self::tokensMatchHaystack($tokens, trim($baseHaystack . ' ' . $legacyText));
+            }
+        }
+
+        return [
+            'matched' => $baseMatched || $legacyMatched,
+            'base_matched' => $baseMatched,
+            'matched_variant_indexes' => [],
+            'combined_variant_indexes' => [],
+            'variants' => [],
+        ];
+    }
+
     protected static function booted()
     {
         static::saved(function ($product) {

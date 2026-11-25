@@ -566,7 +566,7 @@
             <!-- LEFT PANEL: Products Grid -->
             <div class="pos-products-panel">
                 <div class="pos-search-box">
-                    <input type="text" id="posSearch" placeholder="Search base product by name or code...">
+                    <input type="text" id="posSearch" placeholder="Search product or variant by name, code or barcode...">
                     <i class="fas fa-search pos-search-icon"></i>
                 </div>
                 
@@ -581,6 +581,7 @@
                                  data-id="{{ $product['id'] }}" 
                                  data-name="{{ $product['name'] }}" 
                                  data-sku="{{ $product['sku'] }}" 
+                                 data-barcode="{{ $product['barcode'] ?? '' }}"
                                  data-price="{{ $product['price'] }}"
                                  data-wholesale-price="{{ $product['wholesale_price'] }}"
                                  data-weight-per-piece="{{ $product['weight_per_piece'] }}"
@@ -806,13 +807,13 @@
             </div>
             <div class="modal-body p-0">
                 <div class="p-2 bg-light border-bottom">
-                    <input type="text" id="variantSearchInput" class="form-control form-control-sm" placeholder="Search variant size / color...">
+                    <input type="text" id="variantSearchInput" class="form-control form-control-sm" placeholder="Search variant name, size, color or barcode...">
                 </div>
                 <div class="table-responsive">
                     <table class="table table-hover align-middle mb-0">
                         <thead class="table-light">
                             <tr>
-                                <th class="ps-3" style="font-size: 12px;">Variant Size / Color</th>
+                                <th class="ps-3" style="font-size: 12px;">Variant / Size / Color</th>
                                 <th class="text-center" style="font-size: 12px;">Stock</th>
                                 <th class="text-end" style="font-size: 12px;">Price</th>
                                 <th class="text-center" style="width: 140px; font-size: 12px;">Quantity</th>
@@ -1193,13 +1194,47 @@
             $('#walkinNameInput').val('');
         });
 
-        // Filter Grid Products via Search Input
+        let pendingVariantFilter = '';
+
+        function posTokensMatch(tokens, haystack) {
+            if (!tokens.length) return true;
+            const lower = (haystack || '').toString().toLowerCase();
+            return tokens.every(tok => lower.includes(tok));
+        }
+
+        // Filter Grid Products via Search Input (Base + Variants)
         $('#posSearch').on('input', function() {
-            let term = $(this).val().toLowerCase();
+            const rawTerm = ($(this).val() || '').trim().toLowerCase();
+            const tokens = rawTerm ? rawTerm.split(/\s+/).filter(Boolean) : [];
+
             $('.product-card').each(function() {
-                let name = $(this).data('name').toLowerCase();
-                let sku = $(this).data('sku').toLowerCase();
-                if (name.includes(term) || sku.includes(term)) {
+                if (!tokens.length) {
+                    $(this).show();
+                    return;
+                }
+
+                const name = ($(this).data('name') || '').toString();
+                const sku = ($(this).data('sku') || '').toString();
+                const barcode = ($(this).data('barcode') || '').toString();
+                const baseHaystack = `${name} ${sku} ${barcode}`;
+
+                if (posTokensMatch(tokens, baseHaystack)) {
+                    $(this).show();
+                    return;
+                }
+
+                const variants = $(this).data('variants');
+                let variantMatched = false;
+                if (Array.isArray(variants) && variants.length > 0) {
+                    variantMatched = variants.some(v => {
+                        const vSize = (v.size_val && v.size_val !== '-') ? v.size_val : '';
+                        const vColor = (v.color_val && v.color_val !== '-') ? v.color_val : '';
+                        const vHaystack = `${baseHaystack} ${v.name || ''} ${v.variant_name || ''} ${vSize} ${vColor} ${v.barcode || ''}`;
+                        return posTokensMatch(tokens, vHaystack);
+                    });
+                }
+
+                if (variantMatched) {
                     $(this).show();
                 } else {
                     $(this).hide();
@@ -1221,9 +1256,16 @@
                 // Open variants selection popup modal
                 let variants = $(this).data('variants');
                 let productName = $(this).data('name');
+                let sku = ($(this).data('sku') || '').toString();
+                let barcode = ($(this).data('barcode') || '').toString();
                 let sizeMode = $(this).data('size-mode');
                 let piecesPerBox = $(this).data('pieces-per-box') || 1;
                 let idBase = $(this).data('id');
+
+                const posTerm = ($('#posSearch').val() || '').trim();
+                const posTokens = posTerm ? posTerm.toLowerCase().split(/\s+/).filter(Boolean) : [];
+                const baseMatched = posTokens.length > 0 && posTokensMatch(posTokens, `${productName} ${sku} ${barcode}`);
+                pendingVariantFilter = (posTerm && !baseMatched) ? posTerm : '';
                 
                 $('#variantsModalLabel').text(`Select Variant - ${productName}`);
                 let $tbody = $('#variantsModalList');
@@ -1231,10 +1273,13 @@
                 
                 variants.forEach((v) => {
                     let isOut = v.stock_pieces <= 0;
-                    let desc = `${v.size_val !== '-' ? v.size_val : ''} ${v.color_val !== '-' ? '(' + v.color_val + ')' : ''}`;
-                    if (desc.trim() === '') {
+                    let desc = (v.name && v.name.toString().trim() !== '')
+                        ? v.name
+                        : `${v.size_val !== '-' ? v.size_val : ''} ${v.color_val !== '-' ? '(' + v.color_val + ')' : ''}`.trim();
+                    if (!desc) {
                         desc = 'Standard Variant';
                     }
+                    let searchBlob = `${productName} ${desc} ${v.variant_name || ''} ${v.size_val !== '-' ? v.size_val : ''} ${v.color_val !== '-' ? v.color_val : ''} ${v.barcode || ''}`.toLowerCase();
                     
                     let retailPrice = parseFloat(v.price) || 0;
                     let wholesalePrice = parseFloat(v.wholesale_price) || 0;
@@ -1242,21 +1287,20 @@
                     let activePriceMode = $('input[name="pos_price_mode"]:checked').val() || 'retail';
                     let price = (activePriceMode === 'wholesale' && wholesalePrice > 0) ? wholesalePrice : retailPrice;
 
-                    let row = `
-                        <tr data-id="${v.id}" 
-                            data-name="${v.name}" 
-                            data-price="${retailPrice}" 
+                    let $row = $(`
+                        <tr data-id=""
+                            data-name=""
+                            data-price="${retailPrice}"
                             data-wholesale-price="${wholesalePrice}"
                             data-weight-per-piece="${weightPerPiece}"
                             data-stock-pieces="${v.stock_pieces}"
-                            data-size-mode="${sizeMode}"
+                            data-size-mode=""
                             data-pieces-per-box="${piecesPerBox}"
-                            data-variant-data="${v.variant_data}">
-                            <td class="ps-3 fw-bold" style="font-size: 13px;">${desc}</td>
+                            data-variant-data=""
+                            data-search="">
+                            <td class="ps-3 fw-bold" style="font-size: 13px;"></td>
                             <td class="text-center">
-                                <span class="badge ${isOut ? 'bg-danger' : 'bg-success'}" style="font-size: 11px;">
-                                    ${v.stock}
-                                </span>
+                                <span class="badge ${isOut ? 'bg-danger' : 'bg-success'}" style="font-size: 11px;"></span>
                             </td>
                             <td class="text-end fw-bold">Rs ${price.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
                             <td class="text-center">
@@ -1272,8 +1316,21 @@
                                 </button>
                             </td>
                         </tr>
-                    `;
-                    $tbody.append(row);
+                    `);
+                    $row.attr('data-id', v.id);
+                    $row.attr('data-name', v.name);
+                    $row.attr('data-size-mode', sizeMode);
+                    $row.attr('data-variant-data', v.variant_data);
+                    $row.attr('data-search', searchBlob);
+                    $row.data({
+                        id: v.id,
+                        name: v.name,
+                        sizeMode: sizeMode,
+                        variantData: v.variant_data
+                    });
+                    $row.find('td:first').text(desc);
+                    $row.find('td:nth-child(2) .badge').text(v.stock);
+                    $tbody.append($row);
                 });
                 
                 $('#variantsModal').modal('show');
@@ -1957,10 +2014,11 @@
 
         // Variant Search Filter
         $('#variantSearchInput').on('input', function() {
-            let searchTerm = $(this).val().toLowerCase();
+            let rawTerm = ($(this).val() || '').trim().toLowerCase();
+            let tokens = rawTerm ? rawTerm.split(/\s+/).filter(Boolean) : [];
             $('#variantsModalList tr').each(function() {
-                let variantName = $(this).find('td:first').text().toLowerCase();
-                if (variantName.indexOf(searchTerm) > -1) {
+                let searchText = ($(this).attr('data-search') || $(this).find('td:first').text()).toLowerCase();
+                if (posTokensMatch(tokens, searchText)) {
                     $(this).show();
                 } else {
                     $(this).hide();
@@ -1968,10 +2026,10 @@
             });
         });
 
-        // Clear search when modal opens
+        // Apply pending variant search or reset when modal opens
         $('#variantsModal').on('show.bs.modal', function () {
-            $('#variantSearchInput').val('');
-            $('#variantsModalList tr').show();
+            $('#variantSearchInput').val(pendingVariantFilter || '').trigger('input');
+            pendingVariantFilter = '';
         });
 
         // Discount Distribution Modal Trigger

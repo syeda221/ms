@@ -149,31 +149,34 @@ class SaleController extends Controller
 
     public function searchpname(Request $request)
     {
-        $q = $request->get('q');
+        $q = trim((string) $request->get('q', ''));
         $warehouseId = $request->get('warehouse_id', 1);
+        $tokens = Product::tokenizeSearchTerm($q);
 
-        $products = Product::with(['brand', 'unit'])
+        $query = Product::with(['brand', 'unit'])
             ->leftJoin('warehouse_stocks', function ($join) use ($warehouseId) {
                 $join->on('products.id', '=', 'warehouse_stocks.product_id')
                     ->where('warehouse_stocks.warehouse_id', $warehouseId);
             })
-            ->where('products.is_active', true) /* Only active products */
-            ->where(function ($query) use ($q) {
-                $query->where('products.item_name', 'like', "%{$q}%")
-                    ->orWhere('products.item_code', 'like', "%{$q}%")
-                    ->orWhere('products.barcode_path', 'like', "%{$q}%");
-            })
-            ->select(
+            ->where('products.is_active', true); /* Only active products */
+
+        if (!empty($tokens)) {
+            Product::applyTokenSearchFilter($query, $q, 'products');
+        }
+
+        $products = $query->select(
                 'products.*',
                 'warehouse_stocks.total_pieces as wh_stock',
                 'warehouse_stocks.quantity as wh_box_qty'
             )
-            ->limit(50)
-            ->get()
-            ->map(function ($product) {
-                return $product;
-            });
+            ->limit(empty($tokens) ? 50 : 150)
+            ->get();
 
+        if (!empty($tokens)) {
+            $products = $products->filter(function ($product) use ($tokens) {
+                return $product->matchSearchTermDetails($tokens)['matched'];
+            })->take(50)->values();
+        }
 
         return response()->json($products);
     }

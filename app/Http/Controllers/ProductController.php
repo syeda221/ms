@@ -101,22 +101,81 @@ class ProductController extends Controller
     // ===== High Performance Select2 Search (Ajax) =====
     public function ajaxSearch(Request $request)
     {
-        $term = $request->get('term') ?? $request->get('q') ?? '';
+        $term = trim((string) ($request->get('term') ?? $request->get('q') ?? ''));
+        $tokens = Product::tokenizeSearchTerm($term);
+        $perPage = 10;
+        $page = max(1, (int) $request->get('page', 1));
 
-        $query = Product::query()
-            ->select('id', 'item_name', 'item_code', 'barcode_path', 'size_mode', 'unit_id', 'height', 'width', 'pieces_per_box', 'purchase_price_per_box', 'purchase_price_per_m2', 'purchase_price_per_piece', 'pieces_per_m2', 'purchase_discount_percent', 'sale_discount_percent', 'color', 'sale_price_per_piece')
-            ->with(['unit'])
-            ->withSum('warehouseStocks', 'total_pieces') /* Sum PIECES, not boxes */
-            ->where('is_active', true) /* Only active products */
-            ->where(function ($q) use ($term) {
-                $q->where('item_name', 'like', "%{$term}%")
-                    ->orWhere('item_code', 'like', "%{$term}%")
-                    ->orWhere('barcode_path', 'like', "%{$term}%");
+        $selectColumns = [
+            'id', 'item_name', 'item_code', 'barcode_path', 'size_mode', 'unit_id',
+            'height', 'width', 'pieces_per_box', 'purchase_price_per_box',
+            'purchase_price_per_m2', 'purchase_price_per_piece', 'pieces_per_m2',
+            'purchase_discount_percent', 'sale_discount_percent', 'color',
+            'sale_price_per_piece', 'wholesale_price', 'weight_per_piece',
+        ];
+
+        $matchDetailsById = [];
+        $hasMorePages = false;
+
+        if (empty($tokens)) {
+            $paginated = Product::query()
+                ->select($selectColumns)
+                ->with(['unit'])
+                ->withSum('warehouseStocks', 'total_pieces') /* Sum PIECES, not boxes */
+                ->where('is_active', true) /* Only active products */
+                ->paginate($perPage);
+
+            $productCollection = $paginated->getCollection();
+            $hasMorePages = $paginated->hasMorePages();
+        } else {
+            $candidatesQuery = Product::query()
+                ->select('id', 'item_name', 'item_code', 'barcode_path', 'color')
+                ->where('is_active', true);
+
+            Product::applyTokenSearchFilter($candidatesQuery, $term);
+
+            $prioritized = [];
+            foreach ($candidatesQuery->get() as $candidate) {
+                $details = $candidate->matchSearchTermDetails($tokens);
+                if (!$details['matched']) {
+                    continue;
+                }
+                $matchDetailsById[$candidate->id] = $details;
+                $isDirect = $details['base_matched'] || !empty($details['matched_variant_indexes']);
+                $prioritized[] = [
+                    'id' => $candidate->id,
+                    'priority' => $isDirect ? 0 : 1,
+                ];
+            }
+
+            usort($prioritized, function ($a, $b) {
+                return ($a['priority'] <=> $b['priority']) ?: ($a['id'] <=> $b['id']);
             });
 
-        $products = $query->paginate(10); // Lazy loading (10 per request)
+            $totalMatched = count($prioritized);
+            $offset = ($page - 1) * $perPage;
+            $pageIds = array_column(array_slice($prioritized, $offset, $perPage), 'id');
+            $hasMorePages = ($offset + $perPage) < $totalMatched;
 
-        $results = $products->getCollection()->flatMap(function ($p) {
+            if (empty($pageIds)) {
+                return response()->json([
+                    'results' => [],
+                    'pagination' => ['more' => false],
+                ]);
+            }
+
+            $orderLookup = array_flip($pageIds);
+            $productCollection = Product::query()
+                ->select($selectColumns)
+                ->with(['unit'])
+                ->withSum('warehouseStocks', 'total_pieces')
+                ->whereIn('id', $pageIds)
+                ->get()
+                ->sortBy(fn ($p) => $orderLookup[$p->id] ?? PHP_INT_MAX)
+                ->values();
+        }
+
+        $results = $productCollection->flatMap(function ($p) use ($tokens, $matchDetailsById) {
             $stockPieces = (float) ($p->warehouse_stocks_sum_total_pieces ?? 0);
             $ppb = $p->pieces_per_box > 0 ? $p->pieces_per_box : 1;
 
@@ -138,17 +197,27 @@ class ProductController extends Controller
                 $stockDisplay = $loose > 0 ? "$boxes.$loose" : $boxes;
             }
 
-            $variants = [];
-            if ($p->color) {
-                try {
-                    $parsed = is_string($p->color) ? json_decode($p->color, true) : $p->color;
-                    if (is_array($parsed) && count($parsed) > 0 && isset($parsed[0]['name'])) {
-                        $variants = $parsed;
-                    }
-                } catch (\Exception $e) {}
-            }
+            $matchDetails = $matchDetailsById[$p->id] ?? null;
+            $variants = $matchDetails !== null ? $matchDetails['variants'] : Product::parseVariantsFromColor($p->color);
 
             if (count($variants) > 0) {
+                $orderedVariantIndexes = array_keys($variants);
+                if (!empty($tokens) && $matchDetails !== null) {
+                    $ownMatched = $matchDetails['matched_variant_indexes'];
+                    if ($matchDetails['base_matched']) {
+                        $remaining = array_values(array_diff($orderedVariantIndexes, $ownMatched));
+                        $orderedVariantIndexes = array_merge($ownMatched, $remaining);
+                    } else {
+                        $combined = $matchDetails['combined_variant_indexes'];
+                        $remaining = array_values(array_diff($combined, $ownMatched));
+                        $orderedVariantIndexes = array_merge($ownMatched, $remaining);
+                    }
+                }
+
+                if (empty($orderedVariantIndexes)) {
+                    return [];
+                }
+
                 // Fetch all sales and returns for this product to distribute
                 $salesList = DB::table('sale_items')
                     ->join('sales', 'sales.id', '=', 'sale_items.sale_id')
@@ -211,9 +280,12 @@ class ProductController extends Controller
                     ->get();
 
                 $expanded = [];
-                foreach ($variants as $v) {
-                    $size = (isset($v['size']) && $v['size'] !== '-') ? " {$v['size']}" : '';
-                    $color = (isset($v['color']) && $v['color'] !== '-') ? " ({$v['color']})" : '';
+                foreach ($orderedVariantIndexes as $vIdx) {
+                    $v = $variants[$vIdx];
+                    $vSizeStr = trim((string) ($v['size'] ?? ''));
+                    $vColorStr = trim((string) ($v['color'] ?? ''));
+                    $size = ($vSizeStr !== '' && $vSizeStr !== '-') ? " {$vSizeStr}" : '';
+                    $color = ($vColorStr !== '' && $vColorStr !== '-') ? " ({$vColorStr})" : '';
                     $vName = ($v['name'] ?? $p->item_name) . $size . $color;
                     
                     $vUnitName = $v['unit'] ?? $unitName;
@@ -350,6 +422,8 @@ class ProductController extends Controller
                         'stock' => $vStockDisplay,
                         'stock_pieces' => $vBalance,
                         'name' => $vName,
+                        'base_name' => $p->item_name,
+                        'variant_name' => $v['name'] ?? '',
                         'size_mode' => $p->size_mode,
                         'unit_name' => $vUnitName,
                         'pieces_per_box' => $vPpb,
@@ -376,6 +450,8 @@ class ProductController extends Controller
                 'stock' => $stockDisplay,
                 'stock_pieces' => $stockPieces,
                 'name' => $p->item_name,
+                'base_name' => $p->item_name,
+                'variant_name' => '',
                 'size_mode' => $p->size_mode,
                 'unit_name' => $unitName,
                 'pieces_per_box' => $ppb,
@@ -395,27 +471,39 @@ class ProductController extends Controller
 
         return response()->json([
             'results' => $results,
-            'pagination' => ['more' => $products->hasMorePages()],
+            'pagination' => ['more' => $hasMorePages],
         ]);
     }
 
     // ===== Product search (general) =====
     public function searchProducts(Request $request)
     {
-        $term = $request->get('q', '');
+        $term = trim((string) $request->get('q', ''));
+        $tokens = Product::tokenizeSearchTerm($term);
 
-        $products = Product::with('category_relation', 'sub_category_relation', 'brand')
+        $query = Product::with('category_relation', 'sub_category_relation', 'brand')
             ->withSum('warehouseStocks', 'total_pieces')
-            ->where('is_active', true) /* Only active products */
-            ->when($term, function ($query) use ($term) {
-                $query->where('item_name', 'like', "%{$term}%")
-                    ->orWhere('item_code', 'like', "%{$term}%")
-                    ->orWhereHas('category_relation', fn ($q) => $q->where('name', 'like', "%{$term}%"))
-                    ->orWhereHas('sub_category_relation', fn ($q) => $q->where('name', 'like', "%{$term}%"))
-                    ->orWhereHas('brand', fn ($q) => $q->where('name', 'like', "%{$term}%"));
-            })
-            ->limit(500) // limit for performance
-            ->get();
+            ->where('is_active', true); /* Only active products */
+
+        if (!empty($tokens)) {
+            Product::applyTokenSearchFilter($query, $term, '', ['category_relation', 'sub_category_relation', 'brand']);
+        }
+
+        $products = $query->limit(500)->get();
+
+        if (!empty($tokens)) {
+            $products = $products->filter(function ($p) use ($tokens) {
+                if ($p->matchSearchTermDetails($tokens)['matched']) {
+                    return true;
+                }
+                $relHaystack = trim(
+                    ($p->category_relation->name ?? '') . ' ' .
+                    ($p->sub_category_relation->name ?? '') . ' ' .
+                    ($p->brand->name ?? '')
+                );
+                return Product::tokensMatchHaystack($tokens, $relHaystack);
+            })->values();
+        }
 
         return response()->json($products->map(function ($p, $key) {
             $stockPieces = (float) ($p->warehouse_stocks_sum_total_pieces ?? 0);

@@ -2370,7 +2370,7 @@
         </div>
         <div class="offcanvas-body p-2">
             <div class="input-group input-group-sm mb-2">
-                <input type="text" class="form-control" id="sidebarProductSearch" placeholder="Search product by name, barcode or SKU...">
+                <input type="text" class="form-control" id="sidebarProductSearch" placeholder="Search product or variant by name, barcode or SKU...">
                 <button class="btn btn-primary px-2" type="button"><i class="fas fa-search"></i></button>
             </div>
             <div class="overflow-auto pe-1" id="sidebarProductContainer" style="max-height: calc(100vh - 120px);">

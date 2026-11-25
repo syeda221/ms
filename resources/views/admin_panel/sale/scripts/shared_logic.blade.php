@@ -58,7 +58,7 @@
        ========================================= */
     function initProductSelect2($el) {
         $el.select2({
-            placeholder: 'Search Product (Name / SKU / Barcode)',
+            placeholder: 'Search Product or Variant (Name / SKU / Barcode)',
             allowClear: true,
             width: '100%',
             ajax: {
@@ -88,21 +88,29 @@
         });
     }
 
+    function escapeHtml(str) {
+        return $('<div>').text(str == null ? '' : String(str)).html();
+    }
+
     function formatProduct(repo) {
         if (repo.loading) return repo.text;
         let stock = repo.stock !== undefined ? repo.stock : 0;
         let sku = repo.sku || 'N/A';
         let stockVal = parseFloat(repo.stock_pieces !== undefined ? repo.stock_pieces : repo.stock) || 0;
         let badgeClass = stockVal > 0 ? 'bg-success' : 'bg-danger';
+        let displayName = repo.name || repo.text || '';
+        let baseMeta = (repo.base_name && repo.base_name.toLowerCase() !== displayName.toLowerCase())
+            ? ` &bull; Base: ${escapeHtml(repo.base_name)}`
+            : '';
 
         return $(`
         <div class="clearfix">
             <div class="float-start">
-                <div class="fw-bold">${repo.name || repo.text}</div>
-                <small class="text-muted">SKU: ${sku}</small>
+                <div class="fw-bold">${escapeHtml(displayName)}</div>
+                <small class="text-muted">SKU: ${escapeHtml(sku)}${baseMeta}</small>
             </div>
             <div class="float-end">
-                <span class="badge ${badgeClass} rounded-pill">Stock: ${stock}</span>
+                <span class="badge ${badgeClass} rounded-pill">Stock: ${escapeHtml(stock)}</span>
             </div>
         </div>
     `);
@@ -1651,11 +1659,12 @@
 
         // --- Sidebar Direct Add Product ---
         $(document).on('click', '.add-product-direct-btn', function() {
-            const prodId = $(this).data('id');
+            const repoData = $(this).data('repo') || null;
+            const prodId = (repoData && repoData.id) ? repoData.id : $(this).data('id');
             if (!prodId) return;
 
             let $targetRow = $('#salesTableBody tr:last');
-            const lastProdVal = $targetRow.find('.product').val();
+            const lastProdVal = $targetRow.find('.product').val() || $targetRow.find('.product-id-hidden').val();
 
             if (!$targetRow.length || lastProdVal) {
                 addNewRow();
@@ -1663,47 +1672,77 @@
             }
 
             const $select = $targetRow.find('.product');
-            const prodName = $(this).closest('.pos-product-card').find('.pos-product-name').text();
+            const prodName = (repoData && (repoData.name || repoData.text))
+                ? (repoData.name || repoData.text)
+                : $(this).closest('.pos-product-card').find('.pos-product-name').text();
+
             if ($select.find(`option[value="${prodId}"]`).length === 0) {
                 $select.append(new Option(prodName, prodId, true, true));
             } else {
-                $select.val(prodId).trigger('change.select2');
+                $select.val(prodId);
             }
             $select.trigger('change');
+
+            if (repoData && repoData.id) {
+                $select.trigger({
+                    type: 'select2:select',
+                    params: { data: repoData }
+                });
+            } else {
+                const pid = prodId.toString().split('|')[0];
+                $targetRow.find('.product-id-hidden').val(pid);
+                loadWarehousesForProduct($targetRow, pid);
+                fetchProductPrice($targetRow, prodId);
+            }
         });
 
-        // --- Sidebar Live Search ---
+        // --- Sidebar Live Search (Variant-aware) ---
+        let sidebarSearchTimer = null;
         $('#sidebarProductSearch').on('input', function() {
             const q = $(this).val().trim();
-            if (q.length < 1) return;
-            $.get('{{ route('search-product-name') }}', { q: q }).done(function(res) {
-                let html = '';
-                if (res && res.length > 0) {
-                    res.forEach(p => {
-                        const stockText = p.wh_stock ? `${p.wh_stock} Pcs` : '0 Pcs';
-                        const priceText = p.retail_price ? parseFloat(p.retail_price).toFixed(2) : '0.00';
-                        html += `
-                            <div class="pos-product-card">
-                                <div class="pos-product-img">
-                                    <i class="fas fa-box text-secondary fs-5"></i>
-                                </div>
-                                <div class="pos-product-info">
-                                    <div class="pos-product-name" title="${p.item_name}">${p.item_name}</div>
-                                    <div class="pos-product-sub">
-                                        <span class="badge-stock-green">${stockText}</span> SKU: ${p.item_code || '-'}
+            clearTimeout(sidebarSearchTimer);
+            sidebarSearchTimer = setTimeout(function() {
+                $.get('{{ route('products.ajax.search') }}', { term: q, page: 1 }).done(function(res) {
+                    const $container = $('#sidebarProductContainer');
+                    $container.empty();
+                    const items = (res && Array.isArray(res.results)) ? res.results : [];
+                    if (items.length > 0) {
+                        items.forEach(p => {
+                            const displayName = p.name || p.text || '';
+                            const unitLabel = p.unit_name || 'Pcs';
+                            const stockText = p.stock !== undefined ? `${p.stock} ${unitLabel}` : `0 ${unitLabel}`;
+                            const priceVal = parseFloat(p.retail_price || p.trade_price || 0);
+                            const priceText = isNaN(priceVal) ? '0.00' : priceVal.toFixed(2);
+                            const stockVal = parseFloat(p.stock_pieces !== undefined ? p.stock_pieces : p.stock) || 0;
+                            const stockClass = stockVal > 0 ? 'badge-stock-green' : 'badge bg-danger text-white';
+                            const baseInfo = (p.base_name && p.base_name.toLowerCase() !== displayName.toLowerCase())
+                                ? ` &bull; ${escapeHtml(p.base_name)}`
+                                : '';
+
+                            const $card = $(`
+                                <div class="pos-product-card">
+                                    <div class="pos-product-img">
+                                        <i class="fas fa-box text-secondary fs-5"></i>
                                     </div>
-                                </div>
-                                <div class="d-flex align-items-center gap-2">
-                                    <div class="pos-product-price">${priceText}<br><small class="text-muted fs-7">PCS</small></div>
-                                    <button type="button" class="pos-product-add-btn add-product-direct-btn" data-id="${p.id}" title="Add to Grid"><i class="fas fa-plus"></i></button>
-                                </div>
-                            </div>`;
-                    });
-                } else {
-                    html = '<div class="text-center text-muted py-3" style="font-size:0.75rem;">No products found</div>';
-                }
-                $('#sidebarProductContainer').html(html);
-            });
+                                    <div class="pos-product-info">
+                                        <div class="pos-product-name" title="${escapeHtml(displayName)}">${escapeHtml(displayName)}</div>
+                                        <div class="pos-product-sub">
+                                            <span class="${stockClass}">${escapeHtml(stockText)}</span> SKU: ${escapeHtml(p.sku || '-')}${baseInfo}
+                                        </div>
+                                    </div>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <div class="pos-product-price">${priceText}<br><small class="text-muted fs-7">${escapeHtml(unitLabel)}</small></div>
+                                        <button type="button" class="pos-product-add-btn add-product-direct-btn" data-id="${escapeHtml(p.id)}" title="Add to Grid"><i class="fas fa-plus"></i></button>
+                                    </div>
+                                </div>`);
+                            $card.find('.add-product-direct-btn').data('repo', p);
+                            $container.append($card);
+                        });
+                    } else {
+                        $container.html('<div class="text-center text-muted py-3" style="font-size:0.75rem;">No products found</div>');
+                    }
+                });
+            }, 200);
         });
 
         // --- Save & Complete (F9) Handler ---
